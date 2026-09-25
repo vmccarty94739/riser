@@ -3,15 +3,16 @@ import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Appearance, AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { HabitsProvider, useHabits } from '@/hooks/use-habits';
-import { CloudProvider } from '@/hooks/use-cloud';
+import { CloudProvider, useCloud } from '@/hooks/use-cloud';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { RewardsProvider } from '@/hooks/use-rewards';
 import { useTheme } from '@/hooks/use-theme';
+import { coachMessage, subscribeCoach } from '@/lib/coach';
 import { syncReminders } from '@/lib/reminders';
 
 SplashScreen.preventAutoHideAsync();
@@ -113,6 +114,13 @@ function DevDemoLink() {
 /** Keeps the next week of notifications in step with the user's habits. */
 function ReminderSync() {
   const { loaded, habits, challenges, settings } = useHabits();
+  const cloud = useCloud();
+  const daily = useSyncExternalStore(subscribeCoach, () => coachMessage('daily', cloud.user?.id));
+  const coach =
+    settings.coach && daily
+      ? { day: daily.period_start, title: daily.title, body: daily.body }
+      : null;
+  const coachKey = coach ? `${coach.day}|${coach.title}` : '';
   // Bumped when the app returns to the foreground, so "today" and streaks are re-evaluated.
   const [foregrounds, setForegrounds] = useState(0);
 
@@ -126,10 +134,12 @@ function ReminderSync() {
   useEffect(() => {
     if (!loaded) return;
     const timer = setTimeout(() => {
-      syncReminders(habits, challenges, settings).catch(() => {});
+      syncReminders(habits, challenges, settings, coach).catch(() => {});
     }, 800);
     return () => clearTimeout(timer);
-  }, [loaded, habits, challenges, settings, foregrounds]);
+    // `coach` is rebuilt every render; `coachKey` tracks its content.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, habits, challenges, settings, foregrounds, coachKey]);
 
   return null;
 }

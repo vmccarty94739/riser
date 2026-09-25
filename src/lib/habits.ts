@@ -66,6 +66,10 @@ export type Settings = {
   gold: string;
   /** Collapsed Dashboard category sections, as `kind:categoryKey`. */
   collapsed: string[];
+  /** The user agreed to send habit data to the AI coach (off until they opt in). */
+  coach: boolean;
+  /** The Dashboard already offered the coach once (so the offer doesn't keep coming back). */
+  coachAsked: boolean;
 };
 
 /** The trophy ladder. Each win auto-starts the next rung; the last repeats. */

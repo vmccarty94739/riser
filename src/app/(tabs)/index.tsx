@@ -33,6 +33,7 @@ import {
 } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
 import { now } from '@/lib/clock';
+import { CoachNudge } from '@/components/coach-cards';
 import { dailyLine } from '@/lib/daily-lines';
 import { habitCountOn, tierXp } from '@/lib/xp';
 import { categoriesFor, categoryOf, iconText } from '@/lib/icons';
@@ -193,6 +194,8 @@ export default function DashboardScreen() {
   return (
     <ScreenScroll title="Dashboard" subtitle={greeting()} action={<SettingsButton />}>
       {habits.length > 0 && <LevelStrip />}
+
+      <CoachNudge today={today} />
 
       {habits.length > 0 && (
         <SectionHeading

@@ -54,6 +54,8 @@ export const DEFAULT_SETTINGS: Settings = {
   accent: 'blue',
   gold: 'orange',
   collapsed: [],
+  coach: false,
+  coachAsked: false,
 };
 
 export const EMPTY_STORE: Store = {

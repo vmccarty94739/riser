@@ -203,6 +203,17 @@ export default function SettingsScreen() {
         <AccountCard />
       </Section>
 
+      {cloud.configured && (
+        <Section label="AI COACH">
+          <Row
+            title="AI coach"
+            detail="A daily nudge plus weekly and monthly reports. Sends your habit names and check-ins to Anthropic’s Claude."
+            value={settings.coach}
+            onChange={(coach) => updateSettings({ coach, coachAsked: true })}
+          />
+        </Section>
+      )}
+
       <Section label="CHECK-INS">
         <Row
           title="Daily reminders"

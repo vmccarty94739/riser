@@ -76,12 +76,22 @@ function listNames(habits: Habit[]) {
   return `${iconText(habits[0].emoji)} ${habits[0].name} and ${habits.length - 1} more`;
 }
 
+/** The AI coach's latest daily nudge, delivered as the next morning notification. */
+export type CoachNote = { day: string; title: string; body: string };
+
 /** Builds the next week of nudges from the user's actual state. */
-export function planReminders(habits: Habit[], challenges: Challenge[], settings: Settings) {
+export function planReminders(
+  habits: Habit[],
+  challenges: Challenge[],
+  settings: Settings,
+  coach: CoachNote | null = null
+) {
   const now = new Date();
   const today = dayKey();
   const planned: Planned[] = [];
   if (!habits.length) return planned;
+  // The coach's nudge replaces the next upcoming morning message, while it's at most a day old.
+  let coachNote = coach && coach.day >= addDays(today, -1) ? coach : null;
 
   const live = challenges
     .filter((c) => !c.completedAt && !c.dismissed)
@@ -102,10 +112,14 @@ export function planReminders(habits: Habit[], challenges: Challenge[], settings
       }))
       .find(({ index, habit }) => index >= 0 && (!isToday || !isDone(habit, day)));
 
-    // Morning: set the intention.
-    if (settings.morningOn)
+    // Morning: set the intention (or deliver the coach's nudge).
+    const morning = at(day, settings.morning);
+    if (settings.morningOn && coachNote && morning > now) {
+      planned.push({ date: morning, title: `🧠 ${coachNote.title}`, body: coachNote.body });
+      coachNote = null;
+    } else if (settings.morningOn)
       planned.push({
-        date: at(day, settings.morning),
+        date: morning,
         ...(challengeToday
           ? {
               title: `Day ${challengeToday.index + 1} of ${challengeToday.c.length} ${tierFor(challengeToday.c.length).icon}`,
@@ -205,21 +219,32 @@ let queue: Promise<void> = Promise.resolve();
 let generation = 0;
 
 /** Replaces all scheduled nudges with a fresh plan. No-ops without permission. */
-export function syncReminders(habits: Habit[], challenges: Challenge[], settings: Settings) {
+export function syncReminders(
+  habits: Habit[],
+  challenges: Challenge[],
+  settings: Settings,
+  coach: CoachNote | null = null
+) {
   if (!supported) return Promise.resolve();
   const mine = ++generation;
-  const run = queue.then(() => runSync(mine, habits, challenges, settings));
+  const run = queue.then(() => runSync(mine, habits, challenges, settings, coach));
   queue = run.catch(() => {});
   return run;
 }
 
-async function runSync(mine: number, habits: Habit[], challenges: Challenge[], settings: Settings) {
+async function runSync(
+  mine: number,
+  habits: Habit[],
+  challenges: Challenge[],
+  settings: Settings,
+  coach: CoachNote | null
+) {
   if (mine !== generation) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
   // Time travel (developer tools) would schedule on the wrong real dates.
   if (clockOffset() !== 0) return;
   if (!settings.reminders || !(await ensurePermission(false))) return;
-  for (const p of planReminders(habits, challenges, settings)) {
+  for (const p of planReminders(habits, challenges, settings, coach)) {
     if (mine !== generation) return;
     await Notifications.scheduleNotificationAsync({
       content: { title: p.title, body: p.body, sound: 'default' },

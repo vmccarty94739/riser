@@ -40,6 +40,9 @@ A trend graph by category, a 16-week calendar, a report card for every habit, yo
 PROOF PHOTOS
 Snap a photo when you complete a habit. Your Camera Roll keeps them all, sorted by date.
 
+YOUR AI COACH (OPTIONAL)
+Turn on the coach for a personal nudge each morning, written from your real streaks ("You've nailed sleep for 14 days! Water's lagging, so try this…"), plus weekly and monthly reports on what went well and what slipped.
+
 REMINDERS THAT HELP
 A morning intention, reminders at the times you choose, and an evening nudge only if something's still open. Nothing when you're done.
 
@@ -65,6 +68,8 @@ Your habits are saved on your phone and backed up to your private account, so a 
 | User Content → Other User Content (habits, check-ins, notes) | Yes | No | App Functionality |
 
 No analytics, no ads, no third-party tracking. Proof photos stay on the phone and are not collected.
+
+**AI coach:** it's opt-in. Before anything is sent, the app explains that habit names and check-ins go to Anthropic's Claude (App Review Guideline 5.1.2(i) on sharing data with third-party AI). Anthropic is a service provider processing on your behalf for App Functionality, so it doesn't change the answers above (no new data types, no tracking).
 
 **Google Play — Data safety**:
 - Does your app collect or share any of the required user data types? **Yes, collects** (does not share).
@@ -99,7 +104,8 @@ Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and po
 Riser works offline and needs no sign-in: data is backed up to an anonymous account automatically.
 An optional email + password account can be created during onboarding (skippable) or in Settings,
 and permanently deleted in Settings → Account → "Delete account" (or Settings → Erase all data).
-Reminders are local notifications.
+Reminders are local notifications. The optional AI coach (Dashboard card / Progress Report / Settings -> AI coach)
+asks for permission before any habit data is sent to Anthropic's Claude.
 Camera and photo access are only requested when the user adds a proof photo to a completed habit.
 ```
 

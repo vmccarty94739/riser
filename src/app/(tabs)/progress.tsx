@@ -42,6 +42,8 @@ import {
 } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
 import { iconText } from '@/lib/icons';
+import { COACH_ABOUT, CoachReport } from '@/components/coach-cards';
+import { useCloud } from '@/hooks/use-cloud';
 import { habitCountOn, tierXp, wonXp } from '@/lib/xp';
 
 const RANGES = [7, 30, 90] as const;
@@ -252,6 +254,7 @@ export default function ProgressScreen() {
   const [historyDays, setHistoryDays] = useState(7);
   const [openDay, setOpenDay] = useState<string | null>(null);
   const today = dayKey();
+  const cloud = useCloud();
   const quit = kind === 'quit';
   const list = habits.filter((h) => h.kind === kind);
 
@@ -324,6 +327,16 @@ export default function ProgressScreen() {
             } is ${longestKind} ${longestKind === 1 ? 'day' : 'days'}.`}
           />
         </ThemedView>
+      )}
+
+      {cloud.configured && habits.length > 0 && (
+        <>
+          <SectionHeading
+            title="Coach's Report"
+            accessory={<InfoButton title="Coach's Report" text={COACH_ABOUT} />}
+          />
+          <CoachReport today={today} />
+        </>
       )}
 
       {selector}

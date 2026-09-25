@@ -87,7 +87,7 @@ The user designs by five layers; check new work against them: **core function** 
 - **Tables:**
   - `profiles` holds `seen_level` and the `settings` jsonb. `habits`, `checkins` (one row per habit per day; a count of 0 means un-checked) and `challenges` are keyed by `(user_id, id)` and keep the app's own string ids.
   - RLS limits every row to `auth.uid()`. The server sets `updated_at` with a trigger.
-  - Deleting a habit or challenge removes its row; a habit's check-ins go with it by cascade. First, a tombstone `(kind, record_id)` is written to `deletions`, which pulls read so other devices drop the record. Saving a record again clears its tombstone. Migrations run in order: `…_init.sql`, `…_hard_deletes.sql`, then `…_lock_down_helpers.sql`. The remaining Supabase advisor warnings are intentional: `delete_account` callable by signed-in users, and anonymous sign-ins. Leaked-password protection needs the Pro plan.
+  - Deleting a habit or challenge removes its row; a habit's check-ins go with it by cascade. First, a tombstone `(kind, record_id)` is written to `deletions`, which pulls read so other devices drop the record. Saving a record again clears its tombstone. Migrations run in order: `…_init.sql`, `…_hard_deletes.sql`, `…_lock_down_helpers.sql`, then `…_coach_messages.sql`. The remaining Supabase advisor warnings are intentional: `delete_account` callable by signed-in users, and anonymous sign-ins. Leaked-password protection needs the Pro plan.
   - `delete_account()` (security definer) deletes the auth user, and the foreign keys cascade to every row.
   - Proof photos and `bonusXp` never sync. `onboarded` doesn't sync either: signing in sets it from whether the account has data.
 - **`src/lib/sync.ts`** is pure and unit-tested. A `Snapshot` records what the cloud holds per record.
@@ -107,6 +107,19 @@ The user designs by five layers; check new work against them: **core function** 
   - `signOut` and `deleteEverything` wipe local data and return to onboarding.
 - **Auth emails** go out through Gmail SMTP as `riserapp.support@gmail.com` (the Supabase free plan requires custom SMTP before templates can be edited). The Reset Password template shows `{{ .Token }}`; this project's email codes are 8 digits. "Confirm email" is off and anonymous sign-ins are on.
 - Supabase error messages go through `authMessage()` in `src/lib/auth.ts`. Forms live in `src/components/auth-forms.tsx` and are shared by Settings' `AccountCard` and onboarding.
+
+### AI coach (Claude via a Supabase Edge Function)
+- **Flow:** `useCoach(kind, today)` (`src/hooks/use-coach.ts`) → `requestCoach` (`src/lib/coach.ts`) → `supabase.functions.invoke('coach', { kind, today })` → `supabase/functions/coach/index.ts` (Deno).
+  - The function verifies the user, reads their habits, check-ins and challenges **as the user** (RLS), and builds a text digest with `stats.ts` (pure; tested with `deno test supabase/functions/coach`).
+  - It calls `claude-sonnet-5` through `client.messages.parse` with a zod schema (`prompt.ts`), adaptive thinking, effort `medium` for the daily nudge and `high` for reflections.
+  - The result is stored in `coach_messages` with the service role.
+- **Kinds and periods:** `daily` (last 14 days incl. today; cached per day), `weekly` (last 7 full days; cached per Monday-week), `monthly` (last 30 full days; cached per calendar month). The period is `periodStart` in the function, mirrored by `coachPeriod` in the app. Existing rows are returned without calling Claude. There's a global cap of 3,000 new messages per 24h, and dates more than ±2 days from the server's are rejected.
+- **Consent:** off by default (`settings.coach`, plus `coachAsked` for the one-time Dashboard offer). Nothing is sent until the user opts in, per App Store guideline 5.1.2(i). Keep `COACH_ABOUT`, `store/PRIVACY_POLICY.md` and the store notes in step if what's sent changes.
+- **UI:** `CoachNudge` sits on the Dashboard under the level strip, and `CoachReport` (weekly/monthly) under "Coach's Report" on the Progress Report. The latest daily nudge becomes the next morning notification (`planReminders(…, coach)`), since there's no remote push.
+- **Operations:**
+  - The Anthropic key lives only in the `ANTHROPIC_API_KEY` Supabase secret. Without it the function returns 503 `coach_not_configured`, and the app hides the coach.
+  - `supabase/functions/**` is excluded from the app's `tsconfig`/ESLint. Type-check it with `deno check supabase/functions/coach/index.ts`; the function's `deno.json` sets `nodeModulesDir: none`.
+  - Deno refuses npm versions newer than 24h, so pin slightly older ones.
 
 ### UI conventions
 - **Colors** come from `Colors` in `src/constants/theme.ts`; every key must exist in both light and dark.

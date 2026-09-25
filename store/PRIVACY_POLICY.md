@@ -12,14 +12,20 @@ Riser is a habit tracker. This policy explains what information the app handles 
 | Account email address (only if you create an account) | To let you sign in and reset your password | In our authentication service |
 | Account password | To protect your account | Never stored as typed. Only a salted, one-way hash is kept by our authentication service |
 | An anonymous account ID | To link your backed-up data to you, even before you add an email | In our authentication service and cloud database |
+| AI coach messages (only if you turn the coach on) | To show your daily nudge and weekly/monthly reports | In your account on our cloud database |
 | Proof photos you choose to take or pick | To show your progress in Camera Roll and on each habit | On your device only. Photos are not uploaded |
 
 ## How your data is stored and protected
 
 - Riser's cloud database and sign-in are provided by **Supabase** (supabase.com), which acts as our data processor and stores the data on our behalf.
+- If you turn on the AI coach, **Anthropic** (anthropic.com) processes your habit data on our behalf to write your coaching messages.
 - Data is encrypted in transit (HTTPS) and at rest.
 - Access rules in the database ensure each account can read and change only its own data.
 - We don't sell, rent or share your information with anyone, and we don't use it for advertising.
+
+## AI coach (optional)
+
+Riser's AI coach is off until you turn it on. When it's on, Riser sends your habit names, check-in history, streaks and challenges to **Anthropic** (the maker of Claude), which writes your daily nudge and weekly/monthly reports. Anthropic processes this data on our behalf to generate the messages. Under its commercial terms it does not use API data to train its models. Your email address, password and photos are never sent. You can turn the coach off anytime in **Settings → AI coach**, which stops any further data from being sent.
 
 ## Permissions
 
