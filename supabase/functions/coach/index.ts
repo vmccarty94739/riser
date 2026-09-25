@@ -10,10 +10,9 @@
  * SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
  */
 import Anthropic from 'npm:@anthropic-ai/sdk@0.128.0';
-import { zodOutputFormat } from 'npm:@anthropic-ai/sdk@0.128.0/helpers/zod';
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.117.0';
 
-import { DailySchema, instructions, ReflectionSchema, SYSTEM } from './prompt.ts';
+import { DAILY, generate, REFLECTION } from './generate.ts';
 import {
   addDays,
   buildDigest,
@@ -25,9 +24,6 @@ import {
   type Kind,
 } from './stats.ts';
 
-/** Short daily nudges on the fast, low-cost model; reflections on Sonnet for better analysis. */
-const DAILY_MODEL = 'claude-haiku-4-5';
-const REFLECTION_MODEL = 'claude-sonnet-5';
 /** Safety valve on spend: new messages across all users per 24 hours. */
 const GLOBAL_DAILY_CAP = 3000;
 const PAGE = 1000;
@@ -43,8 +39,6 @@ const json = (status: number, body: unknown) =>
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 
-const clip = (text: string, max: number) =>
-  text.length <= max ? text.trim() : `${text.slice(0, max - 1).trimEnd()}…`;
 
 async function allRows<T>(query: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
   const rows: T[] = [];
@@ -82,50 +76,6 @@ async function readUserData(db: SupabaseClient, today: string) {
     ),
   ]);
   return { habits, checkins, challenges };
-}
-
-async function generate(kind: Kind, digest: string) {
-  const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
-  const content = `${instructions(kind)}\n\n<digest>\n${digest}\n</digest>`;
-  const base = {
-    max_tokens: 16000,
-    system: SYSTEM,
-    messages: [{ role: 'user' as const, content }],
-  };
-
-  if (kind === 'daily') {
-    // Haiku 4.5 has no adaptive thinking or effort setting; a short nudge doesn't need thinking.
-    const response = await client.messages.parse({
-      ...base,
-      model: DAILY_MODEL,
-      output_config: { format: zodOutputFormat(DailySchema) },
-    });
-    const out = response.stop_reason === 'refusal' ? null : response.parsed_output;
-    if (!out) return null;
-    return {
-      title: clip(out.title, 60),
-      body: clip(out.message, 300),
-      tip: clip(out.tip, 180),
-      highlights: [],
-    };
-  }
-
-  const response = await client.messages.parse({
-    ...base,
-    model: REFLECTION_MODEL,
-    thinking: { type: 'adaptive' },
-    output_config: { effort: 'medium', format: zodOutputFormat(ReflectionSchema) },
-  });
-  const out = response.stop_reason === 'refusal' ? null : response.parsed_output;
-  if (!out) return null;
-  return {
-    title: clip(out.title, 70),
-    body: clip(out.summary, 480),
-    tip: clip(out.focus, 200),
-    highlights: out.highlights
-      .slice(0, 4)
-      .map((h) => ({ emoji: clip(h.emoji, 8), text: clip(h.text, 140) })),
-  };
 }
 
 Deno.serve(async (req) => {
@@ -185,8 +135,10 @@ Deno.serve(async (req) => {
     if (!data.habits.length) return json(200, { message: null });
 
     const digest = buildDigest({ kind, today, ...data });
-    const written = await generate(kind, digest.text);
-    if (!written) return json(502, { error: 'coach_unavailable' });
+    const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
+    const setup = kind === 'daily' ? DAILY : REFLECTION;
+    const result = await generate(client, kind, digest.text, setup);
+    if (!result) return json(502, { error: 'coach_unavailable' });
 
     const row = {
       user_id: user.id,
@@ -194,8 +146,8 @@ Deno.serve(async (req) => {
       period_start: period,
       range_start: digest.range.start,
       range_end: digest.range.end,
-      model: kind === 'daily' ? DAILY_MODEL : REFLECTION_MODEL,
-      ...written,
+      model: setup.model,
+      ...result.written,
     };
     // Two simultaneous requests may both generate; the first insert wins and both return it.
     const insert = await admin

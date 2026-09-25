@@ -94,3 +94,17 @@ Deno.test('active challenges and trophies are listed', () => {
   assert.match(text, /Active challenge: Meditate, day 3 of 7/);
   assert.match(text, /Trophy earned in this window: 3-day challenge for Meditate/);
 });
+
+Deno.test('daily: today in progress is "not yet", not a miss, and not in the rate', () => {
+  const walk = habit({ id: 'k' });
+  const { text } = buildDigest({
+    kind: 'daily',
+    today: TODAY,
+    habits: [walk],
+    checkins: done('k', ['2026-09-23', '2026-09-24']),
+    challenges: [],
+  });
+  assert.match(text, /Fri ○$/m);
+  assert.match(text, /Done 2\/13 \(15%\) of tracked days before today/);
+  assert.match(text, /Today so far: not yet/);
+});

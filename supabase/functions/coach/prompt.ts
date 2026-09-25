@@ -23,7 +23,11 @@ export const DailySchema = z.object({
   message: z
     .string()
     .describe('The nudge: 1-3 sentences, at most 240 characters, grounded in the numbers.'),
-  tip: z.string().describe('One practical thing to do today, at most 140 characters.'),
+  tip: z
+    .string()
+    .describe(
+      'One practical thing to do today for a named habit, specific to that habit and its pattern, at most 140 characters.'
+    ),
 });
 
 export const ReflectionSchema = z.object({
@@ -49,7 +53,11 @@ export type Reflection = z.infer<typeof ReflectionSchema>;
 
 export function instructions(kind: Kind) {
   if (kind === 'daily')
-    return 'Write today\'s coaching nudge. Pick the one thing that matters most right now: a streak worth protecting, a habit that has been slipping, or a goal that needs adjusting. Example of the tone: "You\'ve nailed sleep for 14 days! But water intake is low. A quick hack: …"';
+    return [
+      "Write today's coaching nudge. Pick the one thing that matters most right now: a streak worth protecting, a habit that has been slipping, or a goal that needs adjusting.",
+      "The tip must name that habit and fit it: use its own pattern from the digest (the weekday it slips, a multi-check-in goal that stalls partway, a streak about to break) and the nature of the habit itself. Generic advice that would fit any habit, like 'set a reminder' or 'stay consistent', doesn't count.",
+      'Example of the tone: "You\'ve nailed sleep for 14 days! But water intake is low. A quick hack: keep a full bottle on your desk and finish it before lunch."',
+    ].join(' ');
   const period = kind === 'weekly' ? 'week' : 'month';
   return `Write this ${period}'s reflection summary. Compare with the previous period where it helps. Example of the tone: "You were most consistent with meditation (92%) but exercise dropped off mid-week."`;
 }

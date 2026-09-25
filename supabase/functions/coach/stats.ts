@@ -114,15 +114,16 @@ function rate(f: HabitFacts, days: string[]) {
   return { done, tracked: tracked.length, text: `${done}/${tracked.length} (${pct(done, tracked.length)})` };
 }
 
-/** ✓ done · ◐ partly done · ✗ missed · – not tracked yet. */
-function symbol(f: HabitFacts, day: string) {
+/** ✓ done · ◐ partly done · ✗ missed · ○ today, not done yet · – not tracked yet. */
+function symbol(f: HabitFacts, day: string, today: string) {
   if (!f.tracked(day)) return '–';
   if (f.isDone(day)) return '✓';
-  return (f.counts.get(day) ?? 0) > 0 ? '◐' : '✗';
+  if ((f.counts.get(day) ?? 0) > 0) return '◐';
+  return day === today ? '○' : '✗';
 }
 
-function grid(f: HabitFacts, days: string[]) {
-  return days.map((d) => `${weekday(d)} ${symbol(f, d)}`).join('  ');
+function grid(f: HabitFacts, days: string[], today: string) {
+  return days.map((d) => `${weekday(d)} ${symbol(f, d, today)}`).join('  ');
 }
 
 /** Weekdays this habit was missed most often, when there's a clear pattern. */
@@ -175,6 +176,8 @@ export function buildDigest(input: {
   const previous = daysFrom(addDays(range.start, -span), addDays(range.start, -1));
   const historyStart = addDays(today, -120);
   const facts = habits.map((h) => factsFor(h, checkins));
+  // Today is still in progress, so rates and patterns only count complete days.
+  const complete = kind === 'daily' ? days.slice(0, -1) : days;
 
   const lines: string[] = [];
   lines.push(`Today is ${pretty(today)}, ${today.slice(0, 4)}.`);
@@ -183,7 +186,9 @@ export function buildDigest(input: {
       ? `Window: the last 14 days (${pretty(range.start)} – today). Today is still in progress.`
       : `Period: the last ${span} full days (${pretty(range.start)} – ${pretty(range.end)}). The ${span} days before that are given for comparison.`
   );
-  lines.push('Key: ✓ done · ◐ partly done (multi-check-in habit) · ✗ missed · – not tracked yet.');
+  lines.push(
+    'Key: ✓ done · ◐ partly done (multi-check-in habit) · ✗ missed · ○ today, not done yet · – not tracked yet.'
+  );
   lines.push('');
 
   for (const f of facts) {
@@ -205,13 +210,13 @@ export function buildDigest(input: {
       }
       lines.push(`  By week: ${buckets.join(' | ')}`);
     } else {
-      lines.push(`  ${grid(f, days)}`);
+      lines.push(`  ${grid(f, days, today)}`);
     }
 
-    const now = rate(f, days);
+    const now = rate(f, complete);
     const before = rate(f, previous);
     lines.push(
-      `  Done ${now.text} of tracked days${
+      `  Done ${now.text} of ${kind === 'daily' ? 'tracked days before today' : 'tracked days'}${
         kind === 'daily' ? '' : `; previous ${span} days: ${before.tracked ? before.text : 'not tracked yet'}`
       }.`
     );
@@ -226,12 +231,12 @@ export function buildDigest(input: {
         }.`
       );
     }
-    const weak = weakDays(f, kind === 'daily' ? days.slice(0, -1) : days);
+    const weak = weakDays(f, complete);
     if (weak.length) lines.push(`  Usually missed on: ${weak.join(', ')}.`);
     lines.push('');
   }
 
-  const perfect = perfectDays(facts, kind === 'daily' ? days.slice(0, -1) : days).length;
+  const perfect = perfectDays(facts, complete).length;
   lines.push(
     `Perfect days (every habit done) in this window: ${perfect}. Current perfect-day streak: ${perfectStreak(facts, today)}.`
   );
