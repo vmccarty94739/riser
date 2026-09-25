@@ -52,17 +52,24 @@ export async function push(db: SupabaseClient, userId: string, changes: Changes)
     );
 }
 
-async function pullTable<T>(db: SupabaseClient, table: string, since: string | null) {
+/** Each table's primary key (minus `user_id`, which RLS fixes), so paging order is stable. */
+const KEYS = {
+  habits: ['id'],
+  challenges: ['id'],
+  checkins: ['habit_id', 'day'],
+  profiles: ['user_id'],
+} as const;
+
+async function pullTable<T>(db: SupabaseClient, table: keyof typeof KEYS, since: string | null) {
   const rows: (T & { updated_at: string })[] = [];
   for (let from = 0; ; from += PAGE) {
     let query = db.from(table).select('*');
     if (since) query = query.gt('updated_at', since);
-    const page = check(
-      await query
-        .order('updated_at')
-        .order(table === 'checkins' ? 'day' : 'id')
-        .range(from, from + PAGE - 1)
-    ) as (T & { updated_at: string })[];
+    query = query.order('updated_at');
+    for (const key of KEYS[table]) query = query.order(key);
+    const page = check(await query.range(from, from + PAGE - 1)) as (T & {
+      updated_at: string;
+    })[];
     rows.push(...page);
     if (page.length < PAGE) return rows;
   }

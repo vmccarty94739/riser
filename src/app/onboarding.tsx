@@ -577,18 +577,25 @@ function SignInStep({ onEmptyAccount }: { onEmptyAccount: () => void }) {
   const cloud = useCloud();
   const [done, setDone] = useState(false);
 
-  if (done && cloud.user && !cloud.user.anonymous)
+  if (done && cloud.user && !cloud.user.anonymous) {
+    const failed = cloud.status === 'offline' || cloud.status === 'error';
     return (
       <View style={styles.centerStep}>
-        <ThemedText style={styles.heroEmoji}>{cloud.status === 'synced' ? '🌱' : '☁️'}</ThemedText>
+        <ThemedText style={styles.heroEmoji}>
+          {cloud.status === 'synced' ? '🌱' : failed ? '⚠️' : '☁️'}
+        </ThemedText>
         <ThemedText type="subtitle" style={styles.center}>
-          {cloud.status === 'synced' ? 'You’re signed in' : 'Loading your habits…'}
+          {cloud.status === 'synced'
+            ? 'You’re signed in'
+            : failed
+              ? 'Couldn’t load your habits'
+              : 'Loading your habits…'}
         </ThemedText>
         <ThemedText themeColor="textSecondary" style={styles.center}>
-          {cloud.status === 'offline'
-            ? 'You’re signed in. Your habits will appear as soon as you’re back online.'
-            : cloud.status === 'synced'
-              ? 'Your account doesn’t have any habits yet. Let’s set some up.'
+          {cloud.status === 'synced'
+            ? 'Your account doesn’t have any habits yet. Let’s set some up.'
+            : failed
+              ? `${cloud.syncError ?? 'Something went wrong.'} We’ll keep trying.`
               : 'This only takes a moment.'}
         </ThemedText>
         {cloud.status === 'synced' && (
@@ -598,8 +605,30 @@ function SignInStep({ onEmptyAccount }: { onEmptyAccount: () => void }) {
             </ThemedText>
           </Pressable>
         )}
+        {failed && (
+          <>
+            <Pressable
+              onPress={cloud.syncNow}
+              style={[styles.primary, styles.full, { backgroundColor: theme.accent }]}>
+              <ThemedText type="smallBold" themeColor="onAccent" style={styles.primaryText}>
+                Try again
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                void cloud.signOut();
+                setDone(false);
+              }}
+              style={styles.secondary}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Use a different account
+              </ThemedText>
+            </Pressable>
+          </>
+        )}
       </View>
     );
+  }
 
   return (
     <View style={styles.step}>

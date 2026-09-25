@@ -48,7 +48,7 @@ const freshMeta = (userId: string, replace = false): Meta => ({
 });
 
 export type CloudUser = { id: string; email: string | null; anonymous: boolean };
-export type CloudStatus = 'off' | 'signed-out' | 'syncing' | 'synced' | 'offline';
+export type CloudStatus = 'off' | 'signed-out' | 'syncing' | 'synced' | 'offline' | 'error';
 /** `verify`: Supabase emailed a code that must be entered with `confirmEmail`. */
 export type CreateResult = 'done' | 'verify-signup' | 'verify-email-change';
 
@@ -58,6 +58,10 @@ type CloudContextValue = {
   user: CloudUser | null;
   status: CloudStatus;
   lastSynced: number | null;
+  /** Why the last sync failed (shown with a "Try again" button), or null. */
+  syncError: string | null;
+  /** Syncs now, including a download, instead of waiting for the next retry. */
+  syncNow: () => void;
   createAccount: (email: string, password: string) => Promise<CreateResult>;
   confirmEmail: (
     kind: Exclude<CreateResult, 'done'>,
@@ -95,6 +99,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
   const [authReady, setAuthReady] = useState(!db);
   const [status, setStatus] = useState<CloudStatus>('syncing');
   const [lastSynced, setLastSynced] = useState<number | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const meta = useRef<Meta | null>(null);
   const [metaReady, setMetaReady] = useState(false);
@@ -198,12 +203,15 @@ export function CloudProvider({ children }: PropsWithChildren) {
       }
       retry.current.attempt = 0;
       setStatus('synced');
+      setSyncError(null);
       setLastSynced(Date.now());
       return true;
-    } catch {
+    } catch (error) {
       if (stale()) return false;
-      // Offline or a server hiccup: keep the changes and try again with backoff.
-      setStatus('offline');
+      // Offline or a server problem: keep the changes and try again with backoff.
+      const message = authMessage(error);
+      setStatus(/offline/i.test(message) ? 'offline' : 'error');
+      setSyncError(message);
       const delay = RETRY_MS[Math.min(retry.current.attempt, RETRY_MS.length - 1)];
       retry.current.attempt++;
       retry.current.timer = setTimeout(() => void syncRef.current({ pull: true }), delay);
@@ -287,6 +295,11 @@ export function CloudProvider({ children }: PropsWithChildren) {
     user,
     status: !db ? 'off' : !user ? 'signed-out' : status,
     lastSynced,
+    syncError,
+    syncNow: () => {
+      retry.current.attempt = 0;
+      void syncRef.current({ pull: true });
+    },
 
     createAccount: async (rawEmail, password) => {
       if (!db) fail({ message: 'Accounts aren’t set up in this build.' });

@@ -17,6 +17,7 @@ const STATUS: Record<CloudStatus, string> = {
   syncing: '🔄  Syncing…',
   synced: '✅  Up to date',
   offline: '📴  Offline, will sync later',
+  error: '⚠️  Sync problem, retrying',
 };
 
 /** Profile card in Settings: the signed-in account, or sign-up / sign-in for guests. */
