@@ -48,7 +48,7 @@ const PRESETS: NewHabit[] = [
   preset('Go for a walk', '🚶'),
   preset('Meditate 5 minutes', '🧘'),
   preset('Do 20 push-ups', '💪', 3),
-  preset('No phone in bed', '📵'),
+  preset('No phone in bed', '📲', 1, 'quit'),
   preset('No smoking', '🚬', 1, 'quit'),
   preset('No doomscrolling', '📱', 1, 'quit'),
 ];

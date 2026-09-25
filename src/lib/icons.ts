@@ -129,6 +129,7 @@ export const QUIT_GROUPS: QuitGroup[] = [
     icons: [
       q('⏰', 'Snoozing', 'No snooze button'),
       q('🦉', 'Staying up late', 'In bed on time'),
+      q('📲', 'Phone in bed', 'No phone in bed'),
       q('😴', 'Oversleeping', 'No oversleeping'),
     ],
   },

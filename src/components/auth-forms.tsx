@@ -15,17 +15,24 @@ type FieldProps = {
   onSubmit?: () => void;
 };
 
-function Input({ style, ...props }: React.ComponentProps<typeof TextInput> & { style?: object }) {
+/** Every auth field shares one look: a rounded box with an optional button on the right. */
+function Input({
+  accessory,
+  ...props
+}: React.ComponentProps<typeof TextInput> & { accessory?: React.ReactNode }) {
   const theme = useTheme();
   return (
-    <TextInput
-      maxFontSizeMultiplier={1.4}
-      placeholderTextColor={theme.textSecondary}
-      autoCapitalize="none"
-      autoCorrect={false}
-      style={[styles.input, { color: theme.text, backgroundColor: theme.background }, style]}
-      {...props}
-    />
+    <View style={[styles.field, { backgroundColor: theme.background }]}>
+      <TextInput
+        maxFontSizeMultiplier={1.4}
+        placeholderTextColor={theme.textSecondary}
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={[styles.input, { color: theme.text }]}
+        {...props}
+      />
+      {accessory}
+    </View>
   );
 }
 
@@ -35,7 +42,7 @@ export function EmailField({ value, onChange, onSubmit }: FieldProps) {
       value={value}
       onChangeText={onChange}
       onSubmitEditing={onSubmit}
-      placeholder="you@example.com"
+      placeholder="Email"
       keyboardType="email-address"
       autoComplete="email"
       textContentType="emailAddress"
@@ -53,24 +60,23 @@ export function PasswordField({
   const theme = useTheme();
   const [show, setShow] = useState(false);
   return (
-    <View style={[styles.passwordRow, { backgroundColor: theme.background }]}>
-      <Input
-        value={value}
-        onChangeText={onChange}
-        onSubmitEditing={onSubmit}
-        placeholder={isNew ? 'Password (8+ characters)' : 'Password'}
-        secureTextEntry={!show}
-        autoComplete={isNew ? 'new-password' : 'current-password'}
-        textContentType={isNew ? 'newPassword' : 'password'}
-        returnKeyType="go"
-        style={styles.flex}
-      />
-      <Pressable onPress={() => setShow((v) => !v)} hitSlop={10} style={styles.show}>
-        <ThemedText type="small" style={{ color: theme.accent }}>
-          {show ? 'Hide' : 'Show'}
-        </ThemedText>
-      </Pressable>
-    </View>
+    <Input
+      value={value}
+      onChangeText={onChange}
+      onSubmitEditing={onSubmit}
+      placeholder={isNew ? 'Password (8+ characters)' : 'Password'}
+      secureTextEntry={!show}
+      autoComplete={isNew ? 'new-password' : 'current-password'}
+      textContentType={isNew ? 'newPassword' : 'password'}
+      returnKeyType="go"
+      accessory={
+        <Pressable onPress={() => setShow((v) => !v)} hitSlop={10} style={styles.show}>
+          <ThemedText type="small" style={{ color: theme.accent }}>
+            {show ? 'Hide' : 'Show'}
+          </ThemedText>
+        </Pressable>
+      }
+    />
   );
 }
 
@@ -84,7 +90,6 @@ function CodeField({ value, onChange }: FieldProps) {
       autoComplete="one-time-code"
       textContentType="oneTimeCode"
       maxLength={10}
-      style={styles.code}
     />
   );
 }
@@ -354,26 +359,19 @@ export function SignInForm({ onDone, onCancel }: { onDone: () => void; onCancel?
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
   form: {
     gap: Spacing.two + 2,
   },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Spacing.three,
+  },
   input: {
+    flex: 1,
     fontSize: 16,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two + 4,
-    borderRadius: Spacing.three,
-  },
-  code: {
-    fontSize: 22,
-    letterSpacing: 6,
-    textAlign: 'center',
-  },
-  passwordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     borderRadius: Spacing.three,
   },
   show: {
