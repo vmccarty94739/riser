@@ -1,30 +1,37 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = useTheme();
 
   return (
     <NativeTabs
       backgroundColor={colors.background}
+      tintColor={colors.accent}
       indicatorColor={colors.backgroundElement}
       labelStyle={{ selected: { color: colors.text } }}>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
+          sf={{ default: 'checklist', selected: 'checklist.checked' }}
+          md="checklist"
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="progress">
+        <NativeTabs.Trigger.Label>Progress Report</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
+          sf={{ default: 'chart.bar', selected: 'chart.bar.fill' }}
+          md="bar_chart"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="photos">
+        <NativeTabs.Trigger.Label>Camera Roll</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'photo.on.rectangle', selected: 'photo.fill.on.rectangle.fill' }}
+          md="photo_library"
         />
       </NativeTabs.Trigger>
     </NativeTabs>

@@ -8,11 +8,15 @@ export type ThemedTextProps = TextProps & {
   themeColor?: ThemeColor;
 };
 
+/** Larger accessibility text sizes are honored, capped so fixed-size rows and rings never clip. */
+const MAX_FONT_SCALE = 1.4;
+
 export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
   const theme = useTheme();
 
   return (
     <Text
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       style={[
         { color: theme[themeColor ?? 'text'] },
         type === 'default' && styles.default,

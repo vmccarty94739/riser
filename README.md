@@ -1,56 +1,81 @@
-# Welcome to your Expo app 👋
+# Riser
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Build good habits, break bad ones, and earn trophies for showing up every day.
 
-## Get started
+Riser is a habit tracker for iOS and Android, built with Expo (React Native). It needs no sign-in and has no backend. Everything stays on the device.
 
-1. Install dependencies
+## Features
 
-   ```bash
-   npm install
-   ```
+- **One-tap check-ins.** Every check-in plays a chime you choose, fires confetti and gives a haptic tap. Habits with several check-ins a day fill up one tap at a time.
+- **Build and Break habits.** You can quit smoking, vaping, alcohol, doomscrolling and more. A bad habit shows red until you log a clean day, then turns green.
+- **Trophy ladders.** Each habit climbs its own ladder of challenges, from 3 to 365 days, and each finished challenge starts the next one. You can also design custom challenges with their own trophy names.
+- **XP and levels.** Each level unlocks new app colors and chimes. XP is shared across your habits, so adding more habits doesn't speed up leveling.
+- **Progress Report.** Includes a trend graph by category, a 16-week calendar heatmap, a report card for every habit, your perfect-day streak and full history.
+- **Camera Roll.** Holds the proof photos attached to completed habits, sorted by date.
+- **Reminders.** A morning intention, reminders at times you choose, and an evening nudge only when something is still open. All are local notifications.
+- **Optional on-device account.** Sign in with email or phone and a password. The password is salted, hashed and kept in the secure keychain/keystore.
+- **Light and dark mode**, with text that stays readable on every unlockable color.
 
-2. Start the app
+## Tech stack
 
-   ```bash
-   npx expo start
-   ```
+Expo SDK 57 · React Native · Expo Router (typed routes, native tabs) · TypeScript (strict) · React Compiler · Reanimated · expo-audio · expo-haptics · expo-notifications · expo-image-picker · expo-secure-store · react-native-svg · Jest (jest-expo)
 
-In the output, you'll find options to open the app in a
+## Project layout
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+src/
+  app/          Screens and routes (Expo Router): onboarding, (tabs), modals
+  components/   UI, including the reward/celebration layer, charts and pickers
+  hooks/        App state (use-habits) and the check-in reward loop (use-rewards)
+  lib/          Pure domain logic: habits, streaks, challenges, XP, reminders, account
+  constants/    Theme colors and unlockable swatches
+assets/         App icons, splash and synthesized reward sounds
+plugins/        Config plugin that keeps notifications local-only
+scripts/        Generators for the artwork and sounds
+store/          Store listing copy, privacy policy, release checklist
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Develop
 
-### Other setup steps
+```bash
+npm install
+npx expo start --tunnel   # scan the QR code with Expo Go
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Command | What it does |
+|---|---|
+| `npm test` | Unit tests for streaks, challenges, XP/levels, reminders, icons, account and theme logic |
+| `npx jest src/lib/__tests__/xp.test.ts` | Run one test file |
+| `npm run typecheck` | TypeScript |
+| `npm run lint` | ESLint |
+| `npx expo-doctor` | Dependency and config health |
 
-## Learn more
+In development builds only, **Settings** ends with developer tools: time travel, challenge shortcuts, previews of every celebration and demo data. Opening the app with `?seed=demo` in the URL (for example `exp://127.0.0.1:8081/--/?seed=demo`) loads a lived-in demo account.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Release
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Builds are made in the cloud with [EAS](https://docs.expo.dev/eas/). The native `ios/` and `android/` folders are generated from `app.json`, not committed.
 
-## Join the community
+```bash
+npx eas-cli@latest login
+npx eas-cli@latest init                                        # once: links the project to your Expo account
+npx eas-cli@latest build --profile preview --platform all      # installable test builds
+npx eas-cli@latest build --profile production --platform all   # store builds (auto-incremented)
+npx eas-cli@latest submit --platform ios                       # upload to App Store Connect
+npx eas-cli@latest submit --platform android                   # upload to Google Play
+```
 
-Join our community of developers creating universal apps.
+Store copy, privacy answers and the pre-submission checklist are in [`store/`](store/).
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Assets
+
+- `scripts/art/make-art.js` draws the app icon, adaptive icon layers, splash, notification icon, favicon and Play feature graphic.
+- `node scripts/synth-sounds.js assets/sounds` synthesizes the reward sounds.
+
+## Privacy
+
+Riser collects no data. There are no servers, analytics, ads or tracking. See [`store/PRIVACY_POLICY.md`](store/PRIVACY_POLICY.md).
+
+## License
+
+Proprietary. Copyright © 2026 Vaden McCarty. All rights reserved. See [LICENSE](LICENSE).
