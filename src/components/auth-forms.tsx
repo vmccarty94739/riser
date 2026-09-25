@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCloud, type CreateResult } from '@/hooks/use-cloud';
 import { useHabits } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
-import { validateCode, validateEmail, validatePassword } from '@/lib/auth';
+import { normalizeEmail, validateCode, validateEmail, validatePassword } from '@/lib/auth';
 
 type FieldProps = {
   value: string;
@@ -15,37 +16,35 @@ type FieldProps = {
   onSubmit?: () => void;
 };
 
-/** Every auth field shares one look: a rounded box with an optional button on the right. */
-function Input({
-  accessory,
-  ...props
-}: React.ComponentProps<typeof TextInput> & { accessory?: React.ReactNode }) {
-  const theme = useTheme();
-  return (
-    <View style={[styles.field, { backgroundColor: theme.background }]}>
-      <TextInput
-        maxFontSizeMultiplier={1.4}
-        placeholderTextColor={theme.textSecondary}
-        autoCapitalize="none"
-        autoCorrect={false}
-        style={[styles.input, { color: theme.text }]}
-        {...props}
-      />
-      {accessory}
-    </View>
-  );
+/** Rules iOS uses when it suggests a strong password, matching `validatePassword`. */
+const PASSWORD_RULES = 'minlength: 8; required: lower; required: upper; required: digit;';
+
+/** Auth fields sit on a card and never auto-capitalize or auto-correct. */
+function Input(props: React.ComponentProps<typeof TextField>) {
+  return <TextField onCard autoCapitalize="none" autoCorrect={false} {...props} />;
 }
 
-export function EmailField({ value, onChange, onSubmit }: FieldProps) {
+/**
+ * The account email. iOS AutoFill pairs a password with the `username` field in the same form,
+ * so this is typed as the username (it still gets the email keyboard). `locked` shows it
+ * read-only, e.g. while choosing a new password, so AutoFill knows which account it's for.
+ */
+export function EmailField({
+  value,
+  onChange,
+  onSubmit,
+  locked,
+}: FieldProps & { locked?: boolean }) {
   return (
     <Input
       value={value}
       onChangeText={onChange}
       onSubmitEditing={onSubmit}
+      editable={!locked}
       placeholder="Email"
       keyboardType="email-address"
       autoComplete="email"
-      textContentType="emailAddress"
+      textContentType="username"
       returnKeyType="next"
     />
   );
@@ -68,9 +67,10 @@ export function PasswordField({
       secureTextEntry={!show}
       autoComplete={isNew ? 'new-password' : 'current-password'}
       textContentType={isNew ? 'newPassword' : 'password'}
+      passwordRules={isNew ? PASSWORD_RULES : undefined}
       returnKeyType="go"
-      accessory={
-        <Pressable onPress={() => setShow((v) => !v)} hitSlop={10} style={styles.show}>
+      trailing={
+        <Pressable onPress={() => setShow((v) => !v)} hitSlop={10}>
           <ThemedText type="small" style={{ color: theme.accent }}>
             {show ? 'Hide' : 'Show'}
           </ThemedText>
@@ -250,7 +250,9 @@ export function SignInForm({ onDone, onCancel }: { onDone: () => void; onCancel?
 
   /** Guests with habits on this phone confirm before the account's data replaces them. */
   const confirmReplace = (go: () => void) => {
-    if (!habits.length || Platform.OS === 'web') return go();
+    // Signing back in to the account these habits already belong to keeps them.
+    const sameAccount = !!cloud.signedOutEmail && normalizeEmail(email) === cloud.signedOutEmail;
+    if (!habits.length || sameAccount || Platform.OS === 'web') return go();
     Alert.alert(
       'Replace this phone’s habits?',
       'Signing in loads your account’s habits. The ones on this phone aren’t linked to an account and will be removed.',
@@ -305,15 +307,14 @@ export function SignInForm({ onDone, onCancel }: { onDone: () => void; onCancel?
             : `Enter the code we emailed to ${email.trim()} and choose a new password.`}
         </ThemedText>
       )}
-      {mode !== 'reset' && (
-        <EmailField
-          value={email}
-          onChange={(v) => {
-            setEmail(v);
-            setError(null);
-          }}
-        />
-      )}
+      <EmailField
+        locked={mode === 'reset'}
+        value={email}
+        onChange={(v) => {
+          setEmail(v);
+          setError(null);
+        }}
+      />
       {mode === 'reset' && <CodeField value={code} onChange={setCode} />}
       {mode !== 'forgot' && (
         <PasswordField
@@ -361,21 +362,6 @@ export function SignInForm({ onDone, onCancel }: { onDone: () => void; onCancel?
 const styles = StyleSheet.create({
   form: {
     gap: Spacing.two + 2,
-  },
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Spacing.three,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 4,
-    borderRadius: Spacing.three,
-  },
-  show: {
-    paddingRight: Spacing.three,
   },
   primary: {
     borderRadius: Spacing.three,

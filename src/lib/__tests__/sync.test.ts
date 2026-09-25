@@ -2,7 +2,6 @@ import { describe, expect, it } from '@jest/globals';
 
 import { DEFAULT_SETTINGS } from '@/hooks/use-habits';
 import {
-  challengeRow,
   diff,
   EMPTY_SNAPSHOT,
   habitRow,
@@ -28,6 +27,7 @@ const remote = (overrides: Partial<RemoteRows> = {}): RemoteRows => ({
   checkins: [],
   challenges: [],
   profile: null,
+  deletions: { habits: [], challenges: [] },
   ...overrides,
 });
 
@@ -109,20 +109,31 @@ describe('sync merge', () => {
 
   it('removes records deleted elsewhere', () => {
     const s = state({
-      habits: [habit({ id: 'a' })],
+      habits: [habit({ id: 'a', log: { '2026-09-24': 1 } })],
       challenges: [challenge({ id: 'c', habitId: 'a' })],
     });
     const result = mergeRemote(
       s,
       snapshotOf(s),
-      remote({
-        habits: [{ ...habitRow(s.habits[0]), deleted_at: '2026-09-24T12:00:00Z' }],
-        challenges: [{ ...challengeRow(s.challenges[0]), deleted_at: '2026-09-24T12:00:00Z' }],
-      })
+      remote({ deletions: { habits: ['a'], challenges: ['c'] } })
     );
     expect(result.state.habits).toHaveLength(0);
     expect(result.state.challenges).toHaveLength(0);
+    expect(Object.keys(result.snapshot.checkins)).toHaveLength(0);
     expect(hasChanges(diff(result.state, result.snapshot))).toBe(false);
+  });
+
+  it('keeps a record edited here after it was deleted elsewhere, so it is saved again', () => {
+    const s = state({ habits: [habit({ id: 'a', name: 'Walk' })] });
+    const snap = snapshotOf(s);
+    const edited = state({ habits: [{ ...s.habits[0], name: 'Walk 30 min' }] });
+    const result = mergeRemote(
+      edited,
+      snap,
+      remote({ deletions: { habits: ['a'], challenges: [] } })
+    );
+    expect(result.state.habits.map((h) => h.name)).toEqual(['Walk 30 min']);
+    expect(diff(result.state, result.snapshot).habits).toHaveLength(1);
   });
 
   it('returns the same state when nothing is new, so syncing never re-renders in a loop', () => {

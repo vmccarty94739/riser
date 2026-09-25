@@ -85,16 +85,20 @@ The user designs by five layers; check new work against them: **core function** 
 ### Cloud sync and auth (Supabase)
 - **Tables:**
   - `profiles` holds `seen_level` and the `settings` jsonb. `habits`, `checkins` (one row per habit per day; a count of 0 means un-checked) and `challenges` are keyed by `(user_id, id)` and keep the app's own string ids.
-  - RLS limits every row to `auth.uid()`. The server sets `updated_at` with a trigger. Habits and challenges are soft-deleted (`deleted_at`) so deletions reach other devices.
+  - RLS limits every row to `auth.uid()`. The server sets `updated_at` with a trigger.
+  - Deleting a habit or challenge removes its row; a habit's check-ins go with it by cascade. First, a tombstone `(kind, record_id)` is written to `deletions`, which pulls read so other devices drop the record. Saving a record again clears its tombstone. Migrations run in order: `…_init.sql`, then `…_hard_deletes.sql`.
   - `delete_account()` (security definer) deletes the auth user, and the foreign keys cascade to every row.
   - Proof photos and `bonusXp` never sync. `onboarded` doesn't sync either: signing in sets it from whether the account has data.
 - **`src/lib/sync.ts`** is pure and unit-tested. A `Snapshot` records what the cloud holds per record.
   - `diff(state, snapshot)` gives the pending changes. There's no outbox, so edits made offline survive restarts automatically.
   - `mergeRemote` applies pulled rows but skips records with pending local edits (local wins and is pushed next). It returns the *same* state object when nothing changed; that is what keeps pull → setStore → push from looping.
   - `replace` mode is for signing in on a new phone.
-- **`src/lib/cloud.ts`** does the network side: `push` (habits before check-ins because of the foreign key; chunked upserts) and `pull` (paged rows since a cursor, re-reading 60s before it).
+- **`src/lib/cloud.ts`** does the network side:
+  - `push`: habits before check-ins because of the foreign key; chunked upserts; tombstone then delete.
+  - `pull`: paged rows since a cursor from every table including `deletions`, ordered by each table's real key, re-reading 60s before the cursor. `profiles` has no `id` column; ordering by one broke every download once.
 - **`src/hooks/use-cloud.tsx`** (`CloudProvider`, `useCloud()`):
-  - It owns the session, silent anonymous sign-in once onboarding is done, and sync triggers: pull + push on session start and foreground, push 1.5s after local edits, and backoff retries while offline.
+  - It owns the session, silent anonymous sign-in once onboarding is done, and sync triggers: pull + push on session start, on foreground and every 60s while open; push 1.5s after local edits; and backoff retries while offline. Failures set `status` to `offline`/`error`, with `syncError` and `syncNow()` for the UI.
+  - If an email account's session is lost, `meta.email` stops the silent guest sign-in, so the data isn't copied to a new guest. `signedOutEmail` prompts a sign-in, and signing back in to the same account merges instead of replacing.
   - Sync metadata (`userId`, `cursor`, `snapshot`, `replace`) lives in AsyncStorage under `riser.sync.v1`. An `epoch` counter plus a `switching` flag stop in-flight syncs from writing across account switches.
   - "Create account" upgrades the anonymous user in place: `updateUser({ email })`, then `{ password }`. If Supabase requires email confirmation, the form asks for the emailed code.
   - `signIn` / `resetPassword` (OTP code) mark the next pull as `replace`.
@@ -110,6 +114,7 @@ The user designs by five layers; check new work against them: **core function** 
 - **Text scaling:** `ThemedText` caps font scaling at 1.4× and `Animated.Text` at 1.2×. Habit-icon emoji don't scale.
 - **Modals:** every transparent `Modal` sets `statusBarTranslucent navigationBarTranslucent` (Android edge-to-edge).
 - **Keyboard:** iOS relies on `automaticallyAdjustKeyboardInsets` in ScrollViews; Android uses `KeyboardAvoidingView` with no behavior, per Expo's SDK 54+ guidance. Onboarding wraps its fixed footer in a `padding` KeyboardAvoidingView on iOS.
+- **Text inputs** always use `TextField` (`src/components/text-field.tsx`): one rounded style, with `onCard` when it sits on a card and `leading`/`trailing`/`footer` slots. Auth email fields use `textContentType="username"` so iOS password AutoFill can pair them, and new-password fields pass `passwordRules`.
 - **Times** are always picked with `TimeField`/`TimePickerSheet` (hour, minute and AM/PM wheels).
 - **Explanations** sit behind an ⓘ (`InfoButton`), not inline text. Section titles use `SectionHeading`, which is smaller than the page title.
 - **Reanimated + React Compiler:** write shared values in event handlers with `.set()`, not `.value =`, because lint flags the latter.

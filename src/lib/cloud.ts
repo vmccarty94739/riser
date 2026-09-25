@@ -27,23 +27,62 @@ function check<T>(result: { data: T; error: unknown }) {
   return result.data;
 }
 
+type Kind = 'habit' | 'challenge';
+const TABLE = { habit: 'habits', challenge: 'challenges' } as const;
+
+/**
+ * Deletes rows for good. The tombstone is written first, so other devices always learn about a
+ * deletion even if the delete itself is interrupted (a retry finishes it).
+ */
+async function remove(db: SupabaseClient, userId: string, kind: Kind, ids: string[]) {
+  for (const batch of chunks(ids)) {
+    const tombstones = batch.map((record_id) => ({ user_id: userId, kind, record_id }));
+    check(
+      await db
+        .from('deletions')
+        .upsert(tombstones, { onConflict: 'user_id,kind,record_id', ignoreDuplicates: false })
+    );
+    check(await db.from(TABLE[kind]).delete().eq('user_id', userId).in('id', batch));
+  }
+}
+
+/** A record saved again after a deletion (e.g. edited on a phone that was offline) is live again. */
+async function clearTombstones(db: SupabaseClient, userId: string, kind: Kind, ids: string[]) {
+  for (const batch of chunks(ids))
+    check(
+      await db
+        .from('deletions')
+        .delete()
+        .eq('user_id', userId)
+        .eq('kind', kind)
+        .in('record_id', batch)
+    );
+}
+
 /** Sends `changes` for `userId`. Habits go first so check-ins never reference a missing habit. */
 export async function push(db: SupabaseClient, userId: string, changes: Changes) {
   const own = <T extends object>(rows: T[]) => rows.map((r) => ({ ...r, user_id: userId }));
-  const now = new Date().toISOString();
 
   for (const rows of chunks(own(changes.habits)))
     check(await db.from('habits').upsert(rows, { onConflict: 'user_id,id' }));
-  for (const ids of chunks(changes.deletedHabits))
-    check(await db.from('habits').update({ deleted_at: now }).eq('user_id', userId).in('id', ids));
+  await clearTombstones(
+    db,
+    userId,
+    'habit',
+    changes.habits.map((h) => h.id)
+  );
+  await remove(db, userId, 'habit', changes.deletedHabits);
   for (const rows of chunks(own(changes.checkins)))
     check(await db.from('checkins').upsert(rows, { onConflict: 'user_id,habit_id,day' }));
   for (const rows of chunks(own(changes.challenges)))
     check(await db.from('challenges').upsert(rows, { onConflict: 'user_id,id' }));
-  for (const ids of chunks(changes.deletedChallenges))
-    check(
-      await db.from('challenges').update({ deleted_at: now }).eq('user_id', userId).in('id', ids)
-    );
+  await clearTombstones(
+    db,
+    userId,
+    'challenge',
+    changes.challenges.map((c) => c.id)
+  );
+  await remove(db, userId, 'challenge', changes.deletedChallenges);
   if (changes.profile)
     check(
       await db
@@ -58,6 +97,7 @@ const KEYS = {
   challenges: ['id'],
   checkins: ['habit_id', 'day'],
   profiles: ['user_id'],
+  deletions: ['kind', 'record_id'],
 } as const;
 
 async function pullTable<T>(db: SupabaseClient, table: keyof typeof KEYS, since: string | null) {
@@ -82,19 +122,29 @@ export async function pull(
 ): Promise<{ rows: RemoteRows; cursor: string | null }> {
   const since = cursor ? new Date(Date.parse(cursor) - OVERLAP_MS).toISOString() : null;
   // RLS already limits every query to the signed-in user's rows.
-  const [habits, challenges, checkins, profiles] = await Promise.all([
+  const [habits, challenges, checkins, profiles, deletions] = await Promise.all([
     pullTable<HabitRow>(db, 'habits', since),
     pullTable<ChallengeRow>(db, 'challenges', since),
     pullTable<CheckinRow>(db, 'checkins', since),
     pullTable<ProfileRow & { user_id: string }>(db, 'profiles', since),
+    pullTable<{ kind: Kind; record_id: string }>(db, 'deletions', since),
   ]);
-  const stamps = [...habits, ...challenges, ...checkins, ...profiles].map((r) => r.updated_at);
+  const stamps = [...habits, ...challenges, ...checkins, ...profiles, ...deletions].map(
+    (r) => r.updated_at
+  );
+  const deleted = (kind: Kind) => deletions.filter((d) => d.kind === kind).map((d) => d.record_id);
   const latest = stamps.reduce<string | null>(
     (max, t) => (!max || Date.parse(t) > Date.parse(max) ? t : max),
     cursor
   );
   return {
-    rows: { habits, challenges, checkins, profile: profiles[0] ?? null },
+    rows: {
+      habits,
+      challenges,
+      checkins,
+      profile: profiles[0] ?? null,
+      deletions: { habits: deleted('habit'), challenges: deleted('challenge') },
+    },
     cursor: latest,
   };
 }

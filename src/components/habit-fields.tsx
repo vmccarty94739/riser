@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
-import { Platform, Pressable, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { HabitIcon } from '@/components/habit-icon';
+import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -151,37 +152,29 @@ export function HabitFields({
       />
 
       <Section label={quit ? 'WHAT ARE YOU QUITTING?' : 'HABIT'}>
-        <ThemedView type="backgroundElement" style={styles.nameRow}>
-          <HabitIcon icon={value.emoji} size={28} />
-          <TextInput
-            maxFontSizeMultiplier={1.4}
-            autoFocus={autoFocus}
-            value={value.name}
-            onChangeText={(name) => set({ name })}
-            placeholder={quit ? 'e.g. No smoking' : 'e.g. Drink a glass of water'}
-            placeholderTextColor={theme.textSecondary}
-            returnKeyType="done"
-            maxLength={40}
-            style={[styles.input, { color: theme.text }]}
-          />
-        </ThemedView>
-        <ThemedView type="backgroundElement" style={styles.noteBox}>
-          <TextInput
-            maxFontSizeMultiplier={1.4}
-            value={value.note}
-            onChangeText={(note) => set({ note: note.replace(/\n/g, ' ') })}
-            placeholder={
-              quit ? 'Your why (optional): e.g. for my kids' : 'Note (optional): e.g. before coffee'
-            }
-            placeholderTextColor={theme.textSecondary}
-            maxLength={NOTE_MAX}
-            multiline
-            style={[styles.noteInput, { color: theme.text }]}
-          />
-          <ThemedText type="small" themeColor="textSecondary" style={styles.counter}>
-            {value.note.length}/{NOTE_MAX}
-          </ThemedText>
-        </ThemedView>
+        <TextField
+          leading={<HabitIcon icon={value.emoji} size={24} />}
+          autoFocus={autoFocus}
+          value={value.name}
+          onChangeText={(name) => set({ name })}
+          placeholder={quit ? 'e.g. No smoking' : 'e.g. Drink a glass of water'}
+          returnKeyType="done"
+          maxLength={40}
+        />
+        <TextField
+          value={value.note}
+          onChangeText={(note) => set({ note: note.replace(/\n/g, ' ') })}
+          placeholder={
+            quit ? 'Your why (optional): e.g. for my kids' : 'Note (optional): e.g. before coffee'
+          }
+          maxLength={NOTE_MAX}
+          multiline
+          footer={
+            <ThemedText type="small" themeColor="textSecondary" style={styles.counter}>
+              {value.note.length}/{NOTE_MAX}
+            </ThemedText>
+          }
+        />
       </Section>
 
       <Section label="ICON">
@@ -424,29 +417,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderRadius: Spacing.three - 2,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Spacing.four,
-    paddingLeft: Spacing.three,
-  },
-  input: {
-    flex: 1,
-    fontSize: 17,
-    padding: Spacing.three,
-  },
-  noteBox: {
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  noteInput: {
-    fontSize: 15,
-    minHeight: 40,
-    paddingTop: Spacing.one,
-  },
   counter: {
-    alignSelf: 'flex-end',
     fontSize: 11,
   },
   iconGroup: {

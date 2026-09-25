@@ -134,9 +134,11 @@ function Guest() {
 
   const body = !cloud.configured
     ? 'Your habits are saved on this phone.'
-    : cloud.user?.anonymous
-      ? 'Your habits are backed up to a guest account. Add an email so you can sign in on a new phone.'
-      : 'Create an account to back up your habits and sign in on any phone.';
+    : cloud.signedOutEmail
+      ? `You were signed out. Sign in again as ${cloud.signedOutEmail} to keep your habits backed up.`
+      : cloud.user?.anonymous
+        ? 'Your habits are backed up to a guest account. Add an email so you can sign in on a new phone.'
+        : 'Create an account to back up your habits and sign in on any phone.';
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
@@ -146,7 +148,11 @@ function Guest() {
         </View>
         <View style={styles.flex}>
           <ThemedText type="smallBold" style={styles.identifier}>
-            {cloud.user?.anonymous ? 'Guest' : 'You’re not signed in'}
+            {cloud.user?.anonymous
+              ? 'Guest'
+              : cloud.signedOutEmail
+                ? 'Signed out'
+                : 'You’re not signed in'}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {body}

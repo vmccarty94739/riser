@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Chip, Section, Segmented } from '@/components/habit-fields';
 import { HabitIcon } from '@/components/habit-icon';
 import { SheetScreen } from '@/components/sheet-screen';
+import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -80,17 +81,12 @@ export default function NewChallengeScreen() {
       </ThemedView>
 
       <Section label="CHALLENGE NAME">
-        <ThemedView type="backgroundElement" style={styles.inputBox}>
-          <TextInput
-            maxFontSizeMultiplier={1.4}
-            value={title}
-            onChangeText={setTitle}
-            maxLength={32}
-            placeholder={`e.g. Sober September · ${length}-Day Challenge`}
-            placeholderTextColor={theme.textSecondary}
-            style={[styles.input, { color: theme.text }]}
-          />
-        </ThemedView>
+        <TextField
+          value={title}
+          onChangeText={setTitle}
+          maxLength={32}
+          placeholder={`e.g. Sober September · ${length}-Day Challenge`}
+        />
       </Section>
 
       <Section label="HABIT">
@@ -191,13 +187,6 @@ const styles = StyleSheet.create({
   previewIcon: {
     fontSize: 40,
     lineHeight: 48,
-  },
-  inputBox: {
-    borderRadius: Spacing.four,
-  },
-  input: {
-    fontSize: 16,
-    padding: Spacing.three,
   },
   habits: {
     gap: Spacing.two,

@@ -30,7 +30,6 @@ export type HabitRow = {
   target: number;
   reminders: string[];
   created_on: string;
-  deleted_at?: string | null;
 };
 
 export type CheckinRow = { habit_id: string; day: string; count: number };
@@ -47,7 +46,6 @@ export type ChallengeRow = {
   start_date: string;
   completed_at: string | null;
   dismissed: boolean;
-  deleted_at?: string | null;
 };
 
 export type ProfileRow = { seen_level: number | null; settings: Partial<Settings> };
@@ -57,6 +55,8 @@ export type RemoteRows = {
   checkins: CheckinRow[];
   challenges: ChallengeRow[];
   profile: ProfileRow | null;
+  /** Ids deleted on another device (from the `deletions` tombstone table). */
+  deletions: { habits: string[]; challenges: string[] };
 };
 
 export type Snapshot = {
@@ -237,14 +237,6 @@ export function mergeRemote<S extends SyncedState>(
     const local = habits[index];
     const pending = local ? habitJson(habitRow(local)) !== snap.habits[r.id] : r.id in snap.habits;
     if (pending && !force) continue;
-    if (r.deleted_at) {
-      delete snapshot.habits[r.id];
-      if (local) {
-        habits.splice(index, 1);
-        changed = true;
-      }
-      continue;
-    }
     snapshot.habits[r.id] = json;
     if (local && habitJson(habitRow(local)) === json) continue;
     const next: Habit = {
@@ -287,19 +279,33 @@ export function mergeRemote<S extends SyncedState>(
       ? challengeJson(challengeRow(local)) !== snap.challenges[r.id]
       : r.id in snap.challenges;
     if (pending && !force) continue;
-    if (r.deleted_at) {
-      delete snapshot.challenges[r.id];
-      if (local) {
-        challenges.splice(index, 1);
-        changed = true;
-      }
-      continue;
-    }
     snapshot.challenges[r.id] = json;
     if (local && challengeJson(challengeRow(local)) === json) continue;
     const next = fromChallengeRow(r);
     challenges = local ? challenges.map((c) => (c.id === r.id ? next : c)) : [...challenges, next];
     changed = true;
+  }
+
+  // Deletions from other devices, unless this phone has since edited the same record.
+  for (const id of remote.deletions.habits) {
+    const local = habits.find((h) => h.id === id);
+    if (local && habitJson(habitRow(local)) !== snap.habits[id] && !force) continue;
+    delete snapshot.habits[id];
+    for (const key of Object.keys(snapshot.checkins))
+      if (key.startsWith(`${id}|`)) delete snapshot.checkins[key];
+    if (local) {
+      habits = habits.filter((h) => h.id !== id);
+      changed = true;
+    }
+  }
+  for (const id of remote.deletions.challenges) {
+    const local = challenges.find((c) => c.id === id);
+    if (local && challengeJson(challengeRow(local)) !== snap.challenges[id] && !force) continue;
+    delete snapshot.challenges[id];
+    if (local) {
+      challenges = challenges.filter((c) => c.id !== id);
+      changed = true;
+    }
   }
 
   let next: S = changed ? { ...state, habits, challenges } : state;

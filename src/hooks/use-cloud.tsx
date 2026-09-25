@@ -30,6 +30,8 @@ import {
 const META_KEY = 'riser.sync.v1';
 const DEBOUNCE_MS = 1500;
 const RETRY_MS = [5_000, 15_000, 60_000, 300_000];
+/** While the app is open, check for changes made on other devices this often. */
+const POLL_MS = 60_000;
 
 type Meta = {
   userId: string;
@@ -38,6 +40,8 @@ type Meta = {
   snapshot: Snapshot;
   /** Set when signing in to an existing account: the next pull replaces local data. */
   replace: boolean;
+  /** The data here belongs to an email account (not a guest), remembered even if the session is lost. */
+  email?: string | null;
 };
 
 const freshMeta = (userId: string, replace = false): Meta => ({
@@ -58,6 +62,8 @@ type CloudContextValue = {
   user: CloudUser | null;
   status: CloudStatus;
   lastSynced: number | null;
+  /** The email account this phone's data belongs to while its session is lost, or null. */
+  signedOutEmail: string | null;
   /** Why the last sync failed (shown with a "Try again" button), or null. */
   syncError: string | null;
   /** Syncs now, including a download, instead of waiting for the next retry. */
@@ -103,6 +109,8 @@ export function CloudProvider({ children }: PropsWithChildren) {
 
   const meta = useRef<Meta | null>(null);
   const [metaReady, setMetaReady] = useState(false);
+  /** Mirrors `meta.email` for rendering. */
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const userRef = useRef<CloudUser | null>(null);
   /** Bumped on every account switch; a sync that started earlier discards its results. */
   const epoch = useRef(0);
@@ -117,6 +125,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
 
   const saveMeta = (next: Meta) => {
     meta.current = next;
+    setAccountEmail(next.email ?? null);
     AsyncStorage.setItem(META_KEY, JSON.stringify(next)).catch(() => {});
   };
 
@@ -124,7 +133,10 @@ export function CloudProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!db) return;
     AsyncStorage.getItem(META_KEY)
-      .then((raw) => (meta.current = raw ? JSON.parse(raw) : null))
+      .then((raw) => {
+        meta.current = raw ? JSON.parse(raw) : null;
+        setAccountEmail(meta.current?.email ?? null);
+      })
       .catch(() => {})
       .finally(() => setMetaReady(true));
     db.auth
@@ -164,6 +176,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
     setStatus('syncing');
     try {
       let m = meta.current?.userId === current.id ? meta.current : freshMeta(current.id);
+      m = { ...m, email: current.anonymous ? null : current.email };
       let state: Store = getStore();
 
       if (m.replace) {
@@ -179,7 +192,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
         state = { ...merged.state, onboarded: !!rows.profile || rows.habits.length > 0 };
         getStore().habits.forEach((h) => Object.values(h.proofs).forEach(deleteProof));
         setStore(state);
-        m = { userId: current.id, cursor, snapshot: merged.snapshot, replace: false };
+        m = { ...m, cursor, snapshot: merged.snapshot, replace: false };
         saveMeta(m);
       } else if (options.pull) {
         const { rows, cursor } = await pull(db, m.cursor);
@@ -229,9 +242,13 @@ export function CloudProvider({ children }: PropsWithChildren) {
     syncRef.current = sync;
   });
 
-  // Back up silently from the moment onboarding is done, with no sign-up required.
+  // Back up silently from the moment onboarding is done, with no sign-up required. Never for data
+  // that belongs to an email account whose session was lost: that user signs back in instead,
+  // rather than having their habits copied into a new guest account.
   useEffect(() => {
-    if (!db || !authReady || !loaded || !onboarded || user || switching.current) return;
+    if (!db || !authReady || !loaded || !metaReady || !onboarded || user || switching.current)
+      return;
+    if (meta.current?.email) return;
     let cancelled = false;
     const attempt = () =>
       db.auth.signInAnonymously().then(({ error }) => {
@@ -243,7 +260,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
       cancelled = true;
       sub.remove();
     };
-  }, [db, authReady, loaded, onboarded, user]);
+  }, [db, authReady, loaded, metaReady, onboarded, user]);
 
   // A new session (launch, sign-in, sign-up): pull, then push.
   useEffect(() => {
@@ -257,12 +274,18 @@ export function CloudProvider({ children }: PropsWithChildren) {
     return () => clearTimeout(timer);
   }, [user, loaded, habits, challenges, settings, seenLevel]);
 
-  // Back in the foreground: pick up changes made on other devices.
+  // Back in the foreground, and every minute while open: pick up changes made on other devices.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void syncRef.current({ pull: true });
     });
-    return () => sub.remove();
+    const poll = setInterval(() => {
+      if (AppState.currentState === 'active') void syncRef.current({ pull: true });
+    }, POLL_MS);
+    return () => {
+      sub.remove();
+      clearInterval(poll);
+    };
   }, []);
 
   const wipeLocal = () => {
@@ -270,10 +293,14 @@ export function CloudProvider({ children }: PropsWithChildren) {
     getStore().habits.forEach((h) => Object.values(h.proofs).forEach(deleteProof));
     setStore(EMPTY_STORE);
     meta.current = null;
+    setAccountEmail(null);
     AsyncStorage.removeItem(META_KEY).catch(() => {});
   };
 
-  /** Runs a sign-in, then marks the new account's data to replace this phone's. */
+  /**
+   * Runs a sign-in, then marks the account's data to replace this phone's. Signing back in to the
+   * account this phone already holds (after a lost session) keeps local changes and just syncs.
+   */
   const adopt = async (signInStep: (db: SupabaseClient) => Promise<User | null>) => {
     if (!db) fail({ message: 'Accounts aren’t set up in this build.' });
     switching.current = true;
@@ -283,7 +310,10 @@ export function CloudProvider({ children }: PropsWithChildren) {
       if (!signedIn) fail({});
       userRef.current = toCloudUser(signedIn);
       setUser(userRef.current);
-      saveMeta(freshMeta(signedIn.id, true));
+      const same = meta.current?.userId === signedIn.id;
+      saveMeta(
+        same && meta.current ? { ...meta.current, replace: false } : freshMeta(signedIn.id, true)
+      );
     } finally {
       switching.current = false;
     }
@@ -295,6 +325,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
     user,
     status: !db ? 'off' : !user ? 'signed-out' : status,
     lastSynced,
+    signedOutEmail: user ? null : accountEmail,
     syncError,
     syncNow: () => {
       retry.current.attempt = 0;
