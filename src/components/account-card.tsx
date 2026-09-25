@@ -96,7 +96,14 @@ export function AccountCard() {
 
       <View style={[styles.details, { borderColor: theme.backgroundSelected }]}>
         <Detail label="Signed in with" value="✉️  Email" />
-        <Detail label="Backup" value={STATUS[cloud.status]} />
+        <Detail
+          label="Backup"
+          value={
+            cloud.pending > 0 && cloud.status !== 'syncing'
+              ? `⏳  ${cloud.pending} change${cloud.pending === 1 ? '' : 's'} waiting to upload`
+              : STATUS[cloud.status]
+          }
+        />
       </View>
 
       <Pressable

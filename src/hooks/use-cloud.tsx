@@ -30,6 +30,8 @@ import {
 const META_KEY = 'riser.sync.v1';
 const DEBOUNCE_MS = 1500;
 const RETRY_MS = [5_000, 15_000, 60_000, 300_000];
+/** A sync still running after this long is treated as stuck, so it can't block syncing forever. */
+const STUCK_MS = 45_000;
 /** While the app is open, check for changes made on other devices this often. */
 const POLL_MS = 60_000;
 
@@ -62,6 +64,8 @@ type CloudContextValue = {
   user: CloudUser | null;
   status: CloudStatus;
   lastSynced: number | null;
+  /** Changes on this phone not yet in the cloud. */
+  pending: number;
   /** The email account this phone's data belongs to while its session is lost, or null. */
   signedOutEmail: string | null;
   /** Why the last sync failed (shown with a "Try again" button), or null. */
@@ -90,6 +94,23 @@ const CloudContext = createContext<CloudContextValue | null>(null);
 
 const toCloudUser = (u: User | null | undefined): CloudUser | null =>
   u ? { id: u.id, email: u.email ?? null, anonymous: !!u.is_anonymous } : null;
+
+/** Development only: sync activity in the Expo server log, to see what a phone really sends. */
+const log = (...args: unknown[]) => {
+  if (__DEV__) console.log('[sync]', ...args);
+};
+
+/** Wall-clock time, kept outside the component (sync runs from effects and timers, not render). */
+const clockMs = () => Date.now();
+
+/** How many records wait to upload. */
+const countChanges = (c: ReturnType<typeof diff>) =>
+  c.habits.length +
+  c.deletedHabits.length +
+  c.checkins.length +
+  c.challenges.length +
+  c.deletedChallenges.length +
+  (c.profile ? 1 : 0);
 
 const sameUser = (a: CloudUser | null, b: CloudUser | null) =>
   a?.id === b?.id && a?.email === b?.email && a?.anonymous === b?.anonymous;
@@ -120,6 +141,9 @@ export function CloudProvider({ children }: PropsWithChildren) {
   /** True while signing in, so no sync runs against a half-switched account. */
   const switching = useRef(false);
   const running = useRef(false);
+  const runningSince = useRef(0);
+  /** Records changed on this phone that the cloud doesn't have yet (shown in Settings). */
+  const [pending, setPending] = useState(0);
   /** The sync in progress, so `flush` can wait for it instead of reporting stale results. */
   const inflight = useRef<Promise<boolean> | null>(null);
   const queued = useRef<{ pull: boolean } | null>(null);
@@ -173,6 +197,12 @@ export function CloudProvider({ children }: PropsWithChildren) {
   }, [db]);
 
   const sync = (options: { pull: boolean }): Promise<boolean> => {
+    if (running.current && clockMs() - runningSince.current > STUCK_MS) {
+      // A request that never came back (the timeout should prevent this) must not block syncing.
+      log('previous sync stuck; starting over');
+      epoch.current++;
+      running.current = false;
+    }
     if (running.current) {
       queued.current = { pull: options.pull || !!queued.current?.pull };
       return Promise.resolve(false);
@@ -188,6 +218,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
     const current = userRef.current;
     if (!db || !current || !loaded || !metaReady || switching.current) return false;
     running.current = true;
+    runningSince.current = clockMs();
     const started = epoch.current;
     const stale = () => epoch.current !== started || userRef.current?.id !== current.id;
     if (retry.current.timer) clearTimeout(retry.current.timer);
@@ -228,6 +259,14 @@ export function CloudProvider({ children }: PropsWithChildren) {
 
       const changes = diff(state, m.snapshot);
       if (hasChanges(changes)) {
+        log('uploading', {
+          habits: changes.habits.map((h) => h.name),
+          deletedHabits: changes.deletedHabits,
+          checkins: changes.checkins.length,
+          challenges: changes.challenges.length,
+          deletedChallenges: changes.deletedChallenges.length,
+          profile: !!changes.profile,
+        });
         await push(db, current.id, changes);
         if (stale()) return false;
         saveMeta({ ...m, snapshot: snapshotOf(state) });
@@ -235,12 +274,15 @@ export function CloudProvider({ children }: PropsWithChildren) {
       retry.current.attempt = 0;
       setStatus('synced');
       setSyncError(null);
-      setLastSynced(Date.now());
+      setLastSynced(clockMs());
+      setPending(countChanges(diff(getStore(), meta.current?.snapshot ?? EMPTY_SNAPSHOT)));
+      log('synced', options.pull ? '(with download)' : '');
       return true;
     } catch (error) {
       if (stale()) return false;
       // Offline or a server problem: keep the changes and try again with backoff.
       const message = authMessage(error);
+      log('failed:', message, error);
       setStatus(/offline/i.test(message) ? 'offline' : 'error');
       setSyncError(message);
       const delay = RETRY_MS[Math.min(retry.current.attempt, RETRY_MS.length - 1)];
@@ -285,12 +327,15 @@ export function CloudProvider({ children }: PropsWithChildren) {
     if (user && loaded && metaReady) void syncRef.current({ pull: true });
   }, [db, user, loaded, metaReady]);
 
-  // Local edits: push shortly after the user stops tapping.
+  // Local edits: count what's waiting, then push shortly after the user stops tapping.
   useEffect(() => {
-    if (!user || !loaded) return;
+    if (!user || !loaded || !metaReady) return;
+    const m = meta.current;
+    if (m?.userId === user.id)
+      setPending(countChanges(diff({ habits, challenges, settings, seenLevel }, m.snapshot)));
     const timer = setTimeout(() => void syncRef.current({ pull: false }), DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [user, loaded, habits, challenges, settings, seenLevel]);
+  }, [user, loaded, metaReady, habits, challenges, settings, seenLevel]);
 
   // Back in the foreground, and every minute while open: pick up changes made on other devices.
   // Leaving the app uploads right away, since the phone may suspend it before the debounce fires.
@@ -346,6 +391,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
     status: !db ? 'off' : !user ? 'signed-out' : status,
     lastSynced,
     signedOutEmail: user ? null : accountEmail,
+    pending,
     syncError,
     syncNow: () => {
       retry.current.attempt = 0;
