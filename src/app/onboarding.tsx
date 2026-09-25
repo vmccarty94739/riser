@@ -25,6 +25,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { iconText } from '@/lib/icons';
 import { ensurePermission } from '@/lib/reminders';
 
+type StepKey = 'welcome' | 'account' | 'pick' | 'challenge' | 'how' | 'remind';
+
 /** Everyone starts with at least this many habits; gaps are filled from `STARTERS`. */
 const MIN_HABITS = 4;
 
@@ -77,15 +79,28 @@ export default function OnboardingScreen() {
   // "I already have an account": the sign-in form replaces the steps until the account loads.
   const [signingIn, setSigningIn] = useState(false);
   const { feedback, confetti } = useRewards();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState<StepKey>('welcome');
+  // The account step shows right after Welcome for anyone not signed in yet. It stays in the
+  // order while on screen, so creating the account doesn't pull it out from under the form.
+  const showAccount = cloud.configured && (!hasAccount || step === 'account');
+  const order: StepKey[] = [
+    'welcome',
+    ...(showAccount ? (['account'] as const) : []),
+    'pick',
+    'challenge',
+    'how',
+    'remind',
+  ];
+  const index = order.indexOf(step);
+  const previous: StepKey | undefined = order[index - 1];
 
-  // Step 1: any number of presets, existing habits and custom habits.
+  // Pick: any number of presets, existing habits and custom habits.
   const [picked, setPicked] = useState<NewHabit[]>([]);
   const [existing, setExisting] = useState<string[]>([]);
   const [draft, setDraft] = useState<NewHabit | null>(null);
-  // Step 2: which pick gets the first challenge (`new:<name>` or `existing:<id>`).
+  // Challenge: which pick gets the first challenge (`new:<name>` or `existing:<id>`).
   const [challengeKey, setChallengeKey] = useState<string | null>(null);
-  // Step 5: notifications.
+  // Remind: notification times.
   const [morning, setMorning] = useState(settings.morning);
   const [evening, setEvening] = useState(settings.evening);
 
@@ -108,13 +123,12 @@ export default function OnboardingScreen() {
   const toggleExisting = (id: string) =>
     setExisting((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
 
-  const goTo = (target: number) => {
-    // The account step only applies when accounts are available and not already set up.
-    const skipAccount = !cloud.configured || hasAccount;
-    const s = target === 4 && skipAccount ? (step < 4 ? 5 : 3) : target;
-    setStep(s);
+  const goTo = (target: StepKey) => {
+    setStep(target);
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
+  const goNext = () => goTo(order[index + 1]);
+  const goBack = () => previous && goTo(previous);
 
   // Android's back button steps back through onboarding instead of leaving the app.
   useEffect(() => {
@@ -123,12 +137,12 @@ export default function OnboardingScreen() {
         setSigningIn(false);
         return true;
       }
-      if (step === 0) return false;
-      setStep((s) => (s === 5 && (!cloud.configured || hasAccount) ? 3 : s - 1));
+      if (!previous) return false;
+      setStep(previous);
       return true;
     });
     return () => sub.remove();
-  }, [step, signingIn, cloud.configured, hasAccount]);
+  }, [previous, signingIn]);
 
   const finish = async (reminders: boolean) => {
     const allowed = reminders ? await ensurePermission(true) : false;
@@ -153,322 +167,326 @@ export default function OnboardingScreen() {
     }, 350);
   };
 
-  const steps = [
-    // 0 — Welcome
-    <View key="welcome" style={styles.centerStep}>
-      <Animated.Text
-        maxFontSizeMultiplier={1.2}
-        entering={ZoomIn.springify().damping(10).delay(100)}
-        style={styles.heroEmoji}>
-        🌱
-      </Animated.Text>
-      <Animated.View entering={FadeInDown.delay(250)}>
-        <ThemedText type="title" style={styles.center}>
-          Small wins.{'\n'}Every day.
-        </ThemedText>
-      </Animated.View>
-      <Animated.View entering={FadeInDown.delay(400)} style={styles.bullets}>
-        {[
-          ['✓', 'Build good habits and quit bad ones'],
-          ['🏆', 'Climb the challenge ladder and earn trophies'],
-          ['🔔', 'Get a nudge right when it matters'],
-        ].map(([icon, text]) => (
-          <View key={text} style={styles.bullet}>
-            <ThemedView type="accentSoft" style={styles.bulletIcon}>
-              <ThemedText style={{ color: theme.accent }}>{icon}</ThemedText>
-            </ThemedView>
-            <ThemedText style={styles.flex}>{text}</ThemedText>
-          </View>
-        ))}
-      </Animated.View>
-    </View>,
-
-    // 1 — Pick habits (any number)
-    <View key="pick" style={styles.step}>
-      <ThemedText type="subtitle">What do you want to work on?</ThemedText>
-      <ThemedText themeColor="textSecondary">
-        Pick as many as you like: good habits to build, bad ones to quit.
-      </ThemedText>
-      <ThemedView type={selectedCount ? 'accentSoft' : 'backgroundElement'} style={styles.counter}>
-        <ThemedText
-          type="smallBold"
-          style={{ color: selectedCount ? theme.accent : theme.textSecondary }}>
-          {selectedCount} selected
-        </ThemedText>
-        {selectedCount > 0 && fillCount > 0 && (
-          <ThemedText type="small" themeColor="textSecondary">
-            We’ll add {fillCount} starter habit{fillCount === 1 ? '' : 's'} so you begin with{' '}
-            {MIN_HABITS}. Remove any later.
-          </ThemedText>
-        )}
-      </ThemedView>
-
-      {habits.length > 0 && (
-        <>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.label}>
-            YOUR HABITS
-          </ThemedText>
-          <View style={styles.presets}>
-            {habits.map((h) => (
-              <PresetCard
-                key={h.id}
-                habit={h}
-                selected={existing.includes(h.id)}
-                onPress={() => toggleExisting(h.id)}
-              />
-            ))}
-          </View>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.label}>
-            ADD NEW
-          </ThemedText>
-        </>
-      )}
-      <View style={styles.presets}>
-        {[...PRESETS, ...picked.filter((p) => !PRESETS.some((x) => x.name === p.name))].map((p) => (
-          <PresetCard
-            key={p.name}
-            habit={p}
-            selected={picked.some((x) => x.name === p.name)}
-            onPress={() => togglePreset(p)}
-          />
-        ))}
-      </View>
-      {draft ? (
-        <Animated.View entering={FadeIn} style={styles.step}>
-          <HabitFields value={draft} onChange={setDraft} autoFocus />
-          <View style={styles.row}>
-            <Pressable onPress={() => setDraft(null)} style={styles.secondary}>
-              <ThemedText themeColor="textSecondary">Cancel</ThemedText>
-            </Pressable>
-            <Pressable
-              disabled={!draft.name.trim()}
-              onPress={() => {
-                setPicked((list) => [
-                  ...list.filter((p) => p.name !== draft.name.trim()),
-                  { ...draft, name: draft.name.trim() },
-                ]);
-                setDraft(null);
-                feedback('tick');
-              }}
-              style={[
-                styles.addButton,
-                { backgroundColor: theme.accent },
-                !draft.name.trim() && styles.disabled,
-              ]}>
-              <ThemedText type="smallBold" themeColor="onAccent">
-                Add to my list
-              </ThemedText>
-            </Pressable>
-          </View>
-        </Animated.View>
-      ) : (
-        <Pressable
-          onPress={() => setDraft(emptyHabit())}
-          style={[styles.dashed, { borderColor: theme.accent }]}>
-          <ThemedText style={{ color: theme.accent }}>+ Create your own</ThemedText>
-        </Pressable>
-      )}
-    </View>,
-
-    // 2 — The first challenge
-    <View key="challenge" style={styles.centerStep}>
-      <ThemedText type="smallBold" style={{ color: theme.gold }}>
-        YOUR FIRST CHALLENGE
-      </ThemedText>
-      <ThemedText type="subtitle" style={styles.center}>
-        🥉 Kickstart: 3 days, no misses
-      </ThemedText>
-      <View style={styles.pips}>
-        {[1, 2, 3].map((d, i) => (
-          <Animated.View
-            key={d}
-            entering={ZoomIn.springify().delay(200 + i * 180)}
-            style={[styles.pip, { borderColor: theme.gold, backgroundColor: theme.goldSoft }]}>
-            <ThemedText type="subtitle" style={{ color: theme.gold }}>
-              {d}
-            </ThemedText>
-          </Animated.View>
-        ))}
+  const screens: Record<StepKey, React.ReactNode> = {
+    welcome: (
+      <View key="welcome" style={styles.centerStep}>
         <Animated.Text
           maxFontSizeMultiplier={1.2}
-          entering={ZoomIn.springify().delay(800)}
-          style={styles.trophy}>
-          🥉
+          entering={ZoomIn.springify().damping(10).delay(100)}
+          style={styles.heroEmoji}>
+          🌱
         </Animated.Text>
-      </View>
-      {choices.length > 1 && (
-        <View style={styles.full}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-            Which habit do you want to start with?
+        <Animated.View entering={FadeInDown.delay(250)}>
+          <ThemedText type="title" style={styles.center}>
+            Small wins.{'\n'}Every day.
           </ThemedText>
-          <View style={styles.choiceList}>
-            {choices.map((c) => {
-              const selected = c.key === challengeChoice?.key;
-              return (
-                <Pressable
-                  key={c.key}
-                  onPress={() => setChallengeKey(c.key)}
-                  style={[
-                    styles.choice,
-                    {
-                      backgroundColor: selected ? theme.goldSoft : theme.backgroundElement,
-                      borderColor: selected ? theme.gold : 'transparent',
-                    },
-                  ]}>
-                  <HabitIcon icon={c.habit.emoji} size={22} quit={c.habit.kind === 'quit'} />
-                  <ThemedText type="small" numberOfLines={1} style={styles.flex}>
-                    {c.habit.name}
-                  </ThemedText>
-                  {selected && (
-                    <ThemedText style={{ color: theme.gold, fontWeight: 800 }}>✓</ThemedText>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      )}
-      {challengeChoice && (
-        <ThemedText themeColor="textSecondary" style={styles.center}>
-          {challengeChoice.habit.kind === 'quit' ? 'Stay clean from' : 'Do'}{' '}
-          {iconText(challengeChoice.habit.emoji)}{' '}
-          <ThemedText type="smallBold">{challengeChoice.habit.name}</ThemedText>
-          {challengeChoice.habit.target > 1 ? ` ${challengeChoice.habit.target} times` : ''} each
-          day for 3 days. Finish and Kickstart is yours. Then 🥈 Week Warrior unlocks, and the
-          ladder keeps going.
-        </ThemedText>
-      )}
-    </View>,
-
-    // 3 — How Riser works
-    <View key="how" style={styles.step}>
-      <ThemedText type="subtitle">How Riser works</ThemedText>
-      <ThemedText themeColor="textSecondary">
-        Three tabs at the bottom. Here’s the whole app in 30 seconds.
-      </ThemedText>
-      {[
-        {
-          icon: '☑️',
-          title: 'Dashboard: check in',
-          body: 'Tap the ring next to a habit to log it. Long-press the ring to undo. Swipe between Build (good habits) and Break (bad habits). Use the arrows by the date to fix past days.',
-        },
-        {
-          icon: '📊',
-          title: 'Progress Report: see how you’re doing',
-          body: 'Your trophy cabinet, perfect-day streak, charts, a calendar of your consistency, a report card for every habit, and your full history, for good and bad habits.',
-        },
-        {
-          icon: '📷',
-          title: 'Camera Roll: your proof',
-          body: 'After checking off a habit, tap the camera on it to snap a proof photo. Every photo is saved here by date.',
-        },
-        {
-          icon: '🏆',
-          title: 'Trophies, XP & levels',
-          body: 'Every habit has its own trophy ladder, from Kickstart to Legend. Every check-in, perfect day and trophy earns XP; level up to unlock new app colors and chimes. Make your own challenges too.',
-        },
-        {
-          icon: '🗑️',
-          title: 'Editing or deleting a habit',
-          body: 'Long-press any habit on the Dashboard for Edit and Delete, or tap it to open its page, where Edit and Delete sit at the top.',
-        },
-        {
-          icon: '⚙️',
-          title: 'Settings',
-          body: 'The gear at the top of each tab: reminder times, light/dark mode, colors and sounds.',
-        },
-      ].map((f, i) => (
-        <Animated.View key={f.title} entering={FadeInDown.delay(70 * i)} style={styles.feature}>
-          <ThemedView type="accentSoft" style={styles.bulletIcon}>
-            <ThemedText style={{ color: theme.accent }}>{f.icon}</ThemedText>
-          </ThemedView>
-          <View style={styles.flex}>
-            <ThemedText type="smallBold">{f.title}</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {f.body}
-            </ThemedText>
-          </View>
         </Animated.View>
-      ))}
-    </View>,
-
-    // 4 — Create an account
-    <View key="account" style={styles.step}>
-      <ThemedText type="subtitle">Back up your progress</ThemedText>
-      <ThemedText themeColor="textSecondary">
-        Create an account so your habits, streaks and trophies are safe, and follow you to a new
-        phone.
-      </ThemedText>
-      <ThemedView type="backgroundElement" style={styles.accountCard}>
-        <CreateAccountForm
-          submitLabel="Create account"
-          onSignInInstead={() => setSigningIn(true)}
-          onDone={() => {
-            feedback('complete');
-            goTo(5);
-          }}
-        />
-      </ThemedView>
-      <ThemedText type="small" themeColor="textSecondary">
-        🔒 Your password is encrypted and never stored on this phone. Skip this and your habits are
-        still backed up to a private guest account.
-      </ThemedText>
-    </View>,
-
-    // 5 — Notifications
-    <View key="remind" style={styles.centerStep}>
-      <ThemedText type="subtitle" style={styles.center}>
-        We’ll keep you on track
-      </ThemedText>
-      <ThemedText themeColor="textSecondary" style={styles.center}>
-        One nudge in the morning to set your intention, one in the evening if something’s still
-        open. Nothing when you’re done.
-      </ThemedText>
-      <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.full}>
-        <ThemedView type="backgroundElement" style={styles.notif}>
-          <ThemedView type="accentSoft" style={styles.notifIcon}>
-            <ThemedText>🌱</ThemedText>
-          </ThemedView>
-          <View style={styles.flex}>
-            <ThemedText type="smallBold">Day 1 of 3 🥉</ThemedText>
+        <Animated.View entering={FadeInDown.delay(400)} style={styles.bullets}>
+          {[
+            ['✓', 'Build good habits and quit bad ones'],
+            ['🏆', 'Climb the challenge ladder and earn trophies'],
+            ['🔔', 'Get a nudge right when it matters'],
+          ].map(([icon, text]) => (
+            <View key={text} style={styles.bullet}>
+              <ThemedView type="accentSoft" style={styles.bulletIcon}>
+                <ThemedText style={{ color: theme.accent }}>{icon}</ThemedText>
+              </ThemedView>
+              <ThemedText style={styles.flex}>{text}</ThemedText>
+            </View>
+          ))}
+        </Animated.View>
+      </View>
+    ),
+    pick: (
+      <View key="pick" style={styles.step}>
+        <ThemedText type="subtitle">What do you want to work on?</ThemedText>
+        <ThemedText themeColor="textSecondary">
+          Pick as many as you like: good habits to build, bad ones to quit.
+        </ThemedText>
+        <ThemedView
+          type={selectedCount ? 'accentSoft' : 'backgroundElement'}
+          style={styles.counter}>
+          <ThemedText
+            type="smallBold"
+            style={{ color: selectedCount ? theme.accent : theme.textSecondary }}>
+            {selectedCount} selected
+          </ThemedText>
+          {selectedCount > 0 && fillCount > 0 && (
             <ThemedText type="small" themeColor="textSecondary">
-              Today’s mission: {challengeChoice && iconText(challengeChoice.habit.emoji)}{' '}
-              {challengeChoice?.habit.name}. Kickstart is waiting.
+              We’ll add {fillCount} starter habit{fillCount === 1 ? '' : 's'} so you begin with{' '}
+              {MIN_HABITS}. Remove any later.
             </ThemedText>
+          )}
+        </ThemedView>
+
+        {habits.length > 0 && (
+          <>
+            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.label}>
+              YOUR HABITS
+            </ThemedText>
+            <View style={styles.presets}>
+              {habits.map((h) => (
+                <PresetCard
+                  key={h.id}
+                  habit={h}
+                  selected={existing.includes(h.id)}
+                  onPress={() => toggleExisting(h.id)}
+                />
+              ))}
+            </View>
+            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.label}>
+              ADD NEW
+            </ThemedText>
+          </>
+        )}
+        <View style={styles.presets}>
+          {[...PRESETS, ...picked.filter((p) => !PRESETS.some((x) => x.name === p.name))].map(
+            (p) => (
+              <PresetCard
+                key={p.name}
+                habit={p}
+                selected={picked.some((x) => x.name === p.name)}
+                onPress={() => togglePreset(p)}
+              />
+            )
+          )}
+        </View>
+        {draft ? (
+          <Animated.View entering={FadeIn} style={styles.step}>
+            <HabitFields value={draft} onChange={setDraft} autoFocus />
+            <View style={styles.row}>
+              <Pressable onPress={() => setDraft(null)} style={styles.secondary}>
+                <ThemedText themeColor="textSecondary">Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                disabled={!draft.name.trim()}
+                onPress={() => {
+                  setPicked((list) => [
+                    ...list.filter((p) => p.name !== draft.name.trim()),
+                    { ...draft, name: draft.name.trim() },
+                  ]);
+                  setDraft(null);
+                  feedback('tick');
+                }}
+                style={[
+                  styles.addButton,
+                  { backgroundColor: theme.accent },
+                  !draft.name.trim() && styles.disabled,
+                ]}>
+                <ThemedText type="smallBold" themeColor="onAccent">
+                  Add to my list
+                </ThemedText>
+              </Pressable>
+            </View>
+          </Animated.View>
+        ) : (
+          <Pressable
+            onPress={() => setDraft(emptyHabit())}
+            style={[styles.dashed, { borderColor: theme.accent }]}>
+            <ThemedText style={{ color: theme.accent }}>+ Create your own</ThemedText>
+          </Pressable>
+        )}
+      </View>
+    ),
+    challenge: (
+      <View key="challenge" style={styles.centerStep}>
+        <ThemedText type="smallBold" style={{ color: theme.gold }}>
+          YOUR FIRST CHALLENGE
+        </ThemedText>
+        <ThemedText type="subtitle" style={styles.center}>
+          🥉 Kickstart: 3 days, no misses
+        </ThemedText>
+        <View style={styles.pips}>
+          {[1, 2, 3].map((d, i) => (
+            <Animated.View
+              key={d}
+              entering={ZoomIn.springify().delay(200 + i * 180)}
+              style={[styles.pip, { borderColor: theme.gold, backgroundColor: theme.goldSoft }]}>
+              <ThemedText type="subtitle" style={{ color: theme.gold }}>
+                {d}
+              </ThemedText>
+            </Animated.View>
+          ))}
+          <Animated.Text
+            maxFontSizeMultiplier={1.2}
+            entering={ZoomIn.springify().delay(800)}
+            style={styles.trophy}>
+            🥉
+          </Animated.Text>
+        </View>
+        {choices.length > 1 && (
+          <View style={styles.full}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+              Which habit do you want to start with?
+            </ThemedText>
+            <View style={styles.choiceList}>
+              {choices.map((c) => {
+                const selected = c.key === challengeChoice?.key;
+                return (
+                  <Pressable
+                    key={c.key}
+                    onPress={() => setChallengeKey(c.key)}
+                    style={[
+                      styles.choice,
+                      {
+                        backgroundColor: selected ? theme.goldSoft : theme.backgroundElement,
+                        borderColor: selected ? theme.gold : 'transparent',
+                      },
+                    ]}>
+                    <HabitIcon icon={c.habit.emoji} size={22} quit={c.habit.kind === 'quit'} />
+                    <ThemedText type="small" numberOfLines={1} style={styles.flex}>
+                      {c.habit.name}
+                    </ThemedText>
+                    {selected && (
+                      <ThemedText style={{ color: theme.gold, fontWeight: 800 }}>✓</ThemedText>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
+        {challengeChoice && (
+          <ThemedText themeColor="textSecondary" style={styles.center}>
+            {challengeChoice.habit.kind === 'quit' ? 'Stay clean from' : 'Do'}{' '}
+            {iconText(challengeChoice.habit.emoji)}{' '}
+            <ThemedText type="smallBold">{challengeChoice.habit.name}</ThemedText>
+            {challengeChoice.habit.target > 1 ? ` ${challengeChoice.habit.target} times` : ''} each
+            day for 3 days. Finish and Kickstart is yours. Then 🥈 Week Warrior unlocks, and the
+            ladder keeps going.
+          </ThemedText>
+        )}
+      </View>
+    ),
+    how: (
+      <View key="how" style={styles.step}>
+        <ThemedText type="subtitle">How Riser works</ThemedText>
+        <ThemedText themeColor="textSecondary">
+          Three tabs at the bottom. Here’s the whole app in 30 seconds.
+        </ThemedText>
+        {[
+          {
+            icon: '☑️',
+            title: 'Dashboard: check in',
+            body: 'Tap the ring next to a habit to log it. Long-press the ring to undo. Swipe between Build (good habits) and Break (bad habits). Use the arrows by the date to fix past days.',
+          },
+          {
+            icon: '📊',
+            title: 'Progress Report: see how you’re doing',
+            body: 'Your trophy cabinet, perfect-day streak, charts, a calendar of your consistency, a report card for every habit, and your full history, for good and bad habits.',
+          },
+          {
+            icon: '📷',
+            title: 'Camera Roll: your proof',
+            body: 'After checking off a habit, tap the camera on it to snap a proof photo. Every photo is saved here by date.',
+          },
+          {
+            icon: '🏆',
+            title: 'Trophies, XP & levels',
+            body: 'Every habit has its own trophy ladder, from Kickstart to Legend. Every check-in, perfect day and trophy earns XP; level up to unlock new app colors and chimes. Make your own challenges too.',
+          },
+          {
+            icon: '🗑️',
+            title: 'Editing or deleting a habit',
+            body: 'Long-press any habit on the Dashboard for Edit and Delete, or tap it to open its page, where Edit and Delete sit at the top.',
+          },
+          {
+            icon: '⚙️',
+            title: 'Settings',
+            body: 'The gear at the top of each tab: reminder times, light/dark mode, colors and sounds.',
+          },
+        ].map((f, i) => (
+          <Animated.View key={f.title} entering={FadeInDown.delay(70 * i)} style={styles.feature}>
+            <ThemedView type="accentSoft" style={styles.bulletIcon}>
+              <ThemedText style={{ color: theme.accent }}>{f.icon}</ThemedText>
+            </ThemedView>
+            <View style={styles.flex}>
+              <ThemedText type="smallBold">{f.title}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                {f.body}
+              </ThemedText>
+            </View>
+          </Animated.View>
+        ))}
+      </View>
+    ),
+    account: (
+      <View key="account" style={styles.step}>
+        <ThemedText type="subtitle">Create your account</ThemedText>
+        <ThemedText themeColor="textSecondary">
+          Your habits, streaks and trophies stay safe and follow you to any phone.
+        </ThemedText>
+        <ThemedView type="backgroundElement" style={styles.accountCard}>
+          <CreateAccountForm
+            submitLabel="Create account"
+            onSignInInstead={() => setSigningIn(true)}
+            onDone={() => {
+              feedback('complete');
+              goTo('pick');
+            }}
+          />
+        </ThemedView>
+        <ThemedText type="small" themeColor="textSecondary">
+          🔒 Your password is encrypted and never stored on this phone. Skip this and your habits
+          are still backed up to a private guest account.
+        </ThemedText>
+      </View>
+    ),
+    remind: (
+      <View key="remind" style={styles.centerStep}>
+        <ThemedText type="subtitle" style={styles.center}>
+          We’ll keep you on track
+        </ThemedText>
+        <ThemedText themeColor="textSecondary" style={styles.center}>
+          One nudge in the morning to set your intention, one in the evening if something’s still
+          open. Nothing when you’re done.
+        </ThemedText>
+        <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.full}>
+          <ThemedView type="backgroundElement" style={styles.notif}>
+            <ThemedView type="accentSoft" style={styles.notifIcon}>
+              <ThemedText>🌱</ThemedText>
+            </ThemedView>
+            <View style={styles.flex}>
+              <ThemedText type="smallBold">Day 1 of 3 🥉</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Today’s mission: {challengeChoice && iconText(challengeChoice.habit.emoji)}{' '}
+                {challengeChoice?.habit.name}. Kickstart is waiting.
+              </ThemedText>
+            </View>
+          </ThemedView>
+        </Animated.View>
+        <ThemedView type="backgroundElement" style={styles.timeCard}>
+          <View style={styles.timeRow}>
+            <ThemedText style={styles.flex}>Morning intention</ThemedText>
+            <TimeField value={morning} title="Morning intention" onChange={setMorning} />
+          </View>
+          <View style={styles.timeRow}>
+            <ThemedText style={styles.flex}>Evening nudge</ThemedText>
+            <TimeField value={evening} title="Evening nudge" onChange={setEvening} />
           </View>
         </ThemedView>
-      </Animated.View>
-      <ThemedView type="backgroundElement" style={styles.timeCard}>
-        <View style={styles.timeRow}>
-          <ThemedText style={styles.flex}>Morning intention</ThemedText>
-          <TimeField value={morning} title="Morning intention" onChange={setMorning} />
-        </View>
-        <View style={styles.timeRow}>
-          <ThemedText style={styles.flex}>Evening nudge</ThemedText>
-          <TimeField value={evening} title="Evening nudge" onChange={setEvening} />
-        </View>
-      </ThemedView>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-        You can change these anytime in Settings.
-      </ThemedText>
-    </View>,
-  ];
+        <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
+          You can change these anytime in Settings.
+        </ThemedText>
+      </View>
+    ),
+  };
 
-  const last = step === steps.length - 1;
-  const cta = [
-    'Get started',
-    selectedCount ? `Continue with ${selectedCount}` : 'Pick at least one',
-    'Accept the challenge ⚔️',
-    'Got it',
-    'Create account',
-    'Turn on notifications',
-  ][step];
-  const canContinue = step === 1 ? selectedCount > 0 && !draft : true;
+  const last = step === 'remind';
+  const cta: Record<StepKey, string> = {
+    welcome: 'Get started',
+    account: 'Create account',
+    pick: selectedCount ? `Continue with ${selectedCount}` : 'Pick at least one',
+    challenge: 'Accept the challenge ⚔️',
+    how: 'Got it',
+    remind: 'Turn on notifications',
+  };
+  const canContinue = step === 'pick' ? selectedCount > 0 && !draft : true;
 
   const onPrimary = () => {
     if (last) return finish(true);
-    feedback(step === 2 ? 'complete' : 'tick');
-    goTo(step + 1);
+    feedback(step === 'challenge' ? 'complete' : 'tick');
+    goNext();
   };
 
   return (
@@ -481,20 +499,20 @@ export default function OnboardingScreen() {
       ]}>
       <View style={styles.topBar}>
         <Pressable
-          disabled={step === 0 && !signingIn}
-          onPress={() => (signingIn ? setSigningIn(false) : goTo(step - 1))}
+          disabled={index === 0 && !signingIn}
+          onPress={() => (signingIn ? setSigningIn(false) : goBack())}
           hitSlop={12}
-          style={[styles.back, step === 0 && !signingIn && styles.hidden]}>
+          style={[styles.back, index === 0 && !signingIn && styles.hidden]}>
           <ThemedText themeColor="textSecondary">Back</ThemedText>
         </Pressable>
         <View style={styles.dots}>
-          {steps.map((_, i) => (
+          {order.map((key, i) => (
             <View
-              key={i}
+              key={key}
               style={[
                 styles.dot,
-                { backgroundColor: i <= step ? theme.accent : theme.backgroundSelected },
-                i === step && styles.dotActive,
+                { backgroundColor: i <= index ? theme.accent : theme.backgroundSelected },
+                i === index && styles.dotActive,
               ]}
             />
           ))}
@@ -511,13 +529,13 @@ export default function OnboardingScreen() {
             <SignInStep
               onEmptyAccount={() => {
                 setSigningIn(false);
-                goTo(1);
+                goTo('pick');
               }}
             />
           </Animated.View>
         ) : (
           <Animated.View key={step} entering={FadeInRight.duration(280)} style={styles.inner}>
-            {steps[step]}
+            {screens[step]}
           </Animated.View>
         )}
       </ScrollView>
@@ -528,32 +546,32 @@ export default function OnboardingScreen() {
           { paddingBottom: insets.bottom + Spacing.three },
           signingIn && styles.hidden,
         ]}>
-        {step !== 4 && (
+        {step !== 'account' && (
           <Pressable
             disabled={!canContinue}
             onPress={onPrimary}
             style={[
               styles.primary,
-              { backgroundColor: step === 2 ? theme.gold : theme.accent },
+              { backgroundColor: step === 'challenge' ? theme.gold : theme.accent },
               !canContinue && styles.disabled,
             ]}>
             <ThemedText
               type="smallBold"
-              themeColor={step === 2 ? 'onGold' : 'onAccent'}
+              themeColor={step === 'challenge' ? 'onGold' : 'onAccent'}
               style={styles.primaryText}>
-              {Platform.OS === 'web' && last ? 'Let’s go' : cta}
+              {Platform.OS === 'web' && last ? 'Let’s go' : cta[step]}
             </ThemedText>
           </Pressable>
         )}
-        {step === 0 && cloud.configured && !hasAccount && (
+        {step === 'welcome' && cloud.configured && !hasAccount && (
           <Pressable onPress={() => setSigningIn(true)} style={styles.secondary}>
             <ThemedText type="small" style={{ color: theme.accent }}>
               I already have an account
             </ThemedText>
           </Pressable>
         )}
-        {step === 4 && (
-          <Pressable onPress={() => goTo(5)} style={styles.secondary}>
+        {step === 'account' && (
+          <Pressable onPress={() => goTo('pick')} style={styles.secondary}>
             <ThemedText type="small" themeColor="textSecondary">
               Skip for now
             </ThemedText>
