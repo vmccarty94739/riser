@@ -275,9 +275,11 @@ export function CloudProvider({ children }: PropsWithChildren) {
   }, [user, loaded, habits, challenges, settings, seenLevel]);
 
   // Back in the foreground, and every minute while open: pick up changes made on other devices.
+  // Leaving the app uploads right away, since the phone may suspend it before the debounce fires.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void syncRef.current({ pull: true });
+      else if (state === 'background') void syncRef.current({ pull: false });
     });
     const poll = setInterval(() => {
       if (AppState.currentState === 'active') void syncRef.current({ pull: true });
