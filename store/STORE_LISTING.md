@@ -43,8 +43,8 @@ Snap a photo when you complete a habit. Your Camera Roll keeps them all, sorted 
 REMINDERS THAT HELP
 A morning intention, reminders at the times you choose, and an evening nudge only if something's still open. Nothing when you're done.
 
-PRIVATE BY DESIGN
-Everything stays on your phone. No ads, no tracking, no analytics.
+BACKED UP AND PRIVATE
+Your habits are saved on your phone and backed up to your private account, so a new phone picks up right where you left off. No ads, no tracking, no analytics.
 ```
 
 **Keywords** (iOS, 100 max, comma-separated, no spaces):
@@ -56,13 +56,23 @@ Everything stays on your phone. No ads, no tracking, no analytics.
 
 ## 2. Privacy answers
 
-**Apple — App Privacy ("nutrition label")**: choose **Data Not Collected**.
-Nothing leaves the device: no servers, analytics, ads or third-party SDKs that collect data. Photos, notes and the optional account stay on the phone.
+**Apple — App Privacy ("nutrition label")**: choose **Data Collected**, then declare:
+
+| Data type | Linked to user | Used for tracking | Purpose |
+|---|---|---|---|
+| Contact Info → Email Address | Yes | No | App Functionality |
+| Identifiers → User ID | Yes | No | App Functionality |
+| User Content → Other User Content (habits, check-ins, notes) | Yes | No | App Functionality |
+
+No analytics, no ads, no third-party tracking. Proof photos stay on the phone and are not collected.
 
 **Google Play — Data safety**:
-- Does your app collect or share any of the required user data types? **No**
-- (Because nothing is transmitted off the device, on-device storage does not count as "collection".)
-- Data deletion: users can delete everything in the app (Settings → Erase all data) or by uninstalling.
+- Does your app collect or share any of the required user data types? **Yes, collects** (does not share).
+- Personal info → **Email address**: collected, optional (only with an account), for App functionality and Account management.
+- App activity → **Other user-generated content** (habits, check-ins, notes): collected, required, for App functionality.
+- App info and performance / Device IDs: not collected.
+- Is data encrypted in transit? **Yes**. Can users request deletion? **Yes** (Settings → Account → Delete account, or email).
+- Supabase processes the data on your behalf, which counts as a service provider, not "sharing".
 
 **Privacy policy URL** (required by both): host `store/PRIVACY_POLICY.md` publicly (GitHub Pages, a Notion public page, Carrd, etc.). Replace `[CONTACT EMAIL]` first.
 
@@ -84,9 +94,10 @@ Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and po
 ## 4. App Review notes (Apple)
 
 ```
-Riser works fully offline and needs no sign-in. The optional account (email or phone + password)
-exists only on the device; it can be created during onboarding (skippable) or in Settings, and
-deleted in Settings → Account → "Sign out & delete account". Reminders are local notifications.
+Riser works offline and needs no sign-in: data is backed up to an anonymous account automatically.
+An optional email + password account can be created during onboarding (skippable) or in Settings,
+and permanently deleted in Settings → Account → "Delete account" (or Settings → Erase all data).
+Reminders are local notifications.
 Camera and photo access are only requested when the user adds a proof photo to a completed habit.
 ```
 

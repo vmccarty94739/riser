@@ -2,7 +2,7 @@
 
 Build good habits, break bad ones, and earn trophies for showing up every day.
 
-Riser is a habit tracker for iOS and Android, built with Expo (React Native). It needs no sign-in and has no backend. Everything stays on the device.
+Riser is a habit tracker for iOS and Android, built with Expo (React Native) and Supabase. It is offline-first: every screen reads from a local copy on the phone, so taps are instant. Changes sync to Supabase in the background.
 
 ## Features
 
@@ -13,12 +13,12 @@ Riser is a habit tracker for iOS and Android, built with Expo (React Native). It
 - **Progress Report.** Includes a trend graph by category, a 16-week calendar heatmap, a report card for every habit, your perfect-day streak and full history.
 - **Camera Roll.** Holds the proof photos attached to completed habits, sorted by date.
 - **Reminders.** A morning intention, reminders at times you choose, and an evening nudge only when something is still open. All are local notifications.
-- **Optional on-device account.** Sign in with email or phone and a password. The password is salted, hashed and kept in the secure keychain/keystore.
+- **Cloud backup and accounts.** Riser backs up to a guest account from the first day, with no sign-up. Add an email and password to sign in on another phone. Includes password reset and in-app account deletion.
 - **Light and dark mode**, with text that stays readable on every unlockable color.
 
 ## Tech stack
 
-Expo SDK 57 · React Native · Expo Router (typed routes, native tabs) · TypeScript (strict) · React Compiler · Reanimated · expo-audio · expo-haptics · expo-notifications · expo-image-picker · expo-secure-store · react-native-svg · Jest (jest-expo)
+Expo SDK 57 · React Native · Expo Router (typed routes, native tabs) · TypeScript (strict) · React Compiler · Reanimated · Supabase (Postgres, Auth, Row Level Security) · expo-audio · expo-haptics · expo-notifications · expo-image-picker · react-native-svg · Jest (jest-expo)
 
 ## Project layout
 
@@ -26,11 +26,12 @@ Expo SDK 57 · React Native · Expo Router (typed routes, native tabs) · TypeSc
 src/
   app/          Screens and routes (Expo Router): onboarding, (tabs), modals
   components/   UI, including the reward/celebration layer, charts and pickers
-  hooks/        App state (use-habits) and the check-in reward loop (use-rewards)
-  lib/          Pure domain logic: habits, streaks, challenges, XP, reminders, account
+  hooks/        Local app state (use-habits), cloud sync + auth (use-cloud), reward loop (use-rewards)
+  lib/          Domain logic: habits, streaks, challenges, XP, reminders, sync diff/merge, Supabase calls
   constants/    Theme colors and unlockable swatches
 assets/         App icons, splash and synthesized reward sounds
 plugins/        Config plugin that keeps notifications local-only
+supabase/       Database schema (SQL migrations)
 scripts/        Generators for the artwork and sounds
 store/          Store listing copy, privacy policy, release checklist
 ```
@@ -39,8 +40,24 @@ store/          Store listing copy, privacy policy, release checklist
 
 ```bash
 npm install
+cp .env.example .env      # then fill in your Supabase URL and publishable key
 npx expo start --tunnel   # scan the QR code with Expo Go
 ```
+
+Without a `.env`, the app runs local-only, with account features hidden.
+
+## Backend (Supabase)
+
+1. Create a Supabase project. Put its URL and **publishable** key in `.env`. Never use the secret key in the app.
+2. Run `supabase/migrations/20260925000000_init.sql` in the dashboard's **SQL Editor**. It creates the tables, Row Level Security policies, `updated_at` triggers and the `delete_account()` function.
+3. Go to **Authentication → Sign In / Providers**. Enable **anonymous sign-ins**, keep **Email** enabled, and turn off **Confirm email**. If you leave confirmation on, the app asks for the emailed code instead.
+4. Go to **Authentication → Emails → Reset Password**. Add `{{ .Token }}` to the template, because the app resets passwords with an emailed code rather than a link.
+5. Before launch, set up custom SMTP (Authentication → Emails → SMTP). Supabase's built-in sender only delivers to your own team.
+
+**How sync works:**
+- The local store in AsyncStorage stays the source of truth for the UI.
+- `src/lib/sync.ts` compares it with a snapshot of what the cloud holds and pushes the difference: after edits (debounced), on launch, on foreground and with backoff while offline.
+- It pulls rows changed since the last pull. Pending local edits win conflicts.
 
 | Command | What it does |
 |---|---|

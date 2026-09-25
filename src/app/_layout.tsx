@@ -8,6 +8,7 @@ import { Appearance, AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { HabitsProvider, useHabits } from '@/hooks/use-habits';
+import { CloudProvider } from '@/hooks/use-cloud';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { RewardsProvider } from '@/hooks/use-rewards';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,16 +19,18 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   return (
     <HabitsProvider>
-      <NavigationTheme>
-        <RewardsProvider>
-          <AppearanceSync />
-          <RootStack />
-          <ReminderSync />
-          {__DEV__ && <DevDemoLink />}
-          <StatusBar style="auto" />
-        </RewardsProvider>
-      </NavigationTheme>
-      <AnimatedSplashOverlay />
+      <CloudProvider>
+        <NavigationTheme>
+          <RewardsProvider>
+            <AppearanceSync />
+            <RootStack />
+            <ReminderSync />
+            {__DEV__ && <DevDemoLink />}
+            <StatusBar style="auto" />
+          </RewardsProvider>
+        </NavigationTheme>
+        <AnimatedSplashOverlay />
+      </CloudProvider>
     </HabitsProvider>
   );
 }

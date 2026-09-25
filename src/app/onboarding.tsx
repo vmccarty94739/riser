@@ -6,27 +6,22 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeInRight, ZoomIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { emptyHabit, HabitFields, Segmented } from '@/components/habit-fields';
+import { CreateAccountForm, SignInForm } from '@/components/auth-forms';
+import { emptyHabit, HabitFields } from '@/components/habit-fields';
 import { HabitIcon } from '@/components/habit-icon';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { TimeField } from '@/components/time-picker';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useCloud } from '@/hooks/use-cloud';
 import { describeTarget, useHabits, type NewHabit } from '@/hooks/use-habits';
 import { useRewards } from '@/hooks/use-rewards';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  createAccount,
-  validateIdentifier,
-  validatePassword,
-  type AccountMethod,
-} from '@/lib/account';
 import { iconText } from '@/lib/icons';
 import { ensurePermission } from '@/lib/reminders';
 
@@ -76,8 +71,11 @@ export default function OnboardingScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
-  const { habits, addHabit, startChallenge, updateSettings, setOnboarded, setAccount, settings } =
-    useHabits();
+  const { habits, addHabit, startChallenge, updateSettings, setOnboarded, settings } = useHabits();
+  const cloud = useCloud();
+  const hasAccount = !!cloud.user && !cloud.user.anonymous;
+  // "I already have an account": the sign-in form replaces the steps until the account loads.
+  const [signingIn, setSigningIn] = useState(false);
   const { feedback, confetti } = useRewards();
   const [step, setStep] = useState(0);
 
@@ -87,13 +85,6 @@ export default function OnboardingScreen() {
   const [draft, setDraft] = useState<NewHabit | null>(null);
   // Step 2: which pick gets the first challenge (`new:<name>` or `existing:<id>`).
   const [challengeKey, setChallengeKey] = useState<string | null>(null);
-  // Step 4: account.
-  const [method, setMethod] = useState<AccountMethod>('email');
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [accountError, setAccountError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   // Step 5: notifications.
   const [morning, setMorning] = useState(settings.morning);
   const [evening, setEvening] = useState(settings.evening);
@@ -117,7 +108,10 @@ export default function OnboardingScreen() {
   const toggleExisting = (id: string) =>
     setExisting((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
 
-  const goTo = (s: number) => {
+  const goTo = (target: number) => {
+    // The account step only applies when accounts are available and not already set up.
+    const skipAccount = !cloud.configured || hasAccount;
+    const s = target === 4 && skipAccount ? (step < 4 ? 5 : 3) : target;
     setStep(s);
     scroll.current?.scrollTo({ y: 0, animated: false });
   };
@@ -125,28 +119,16 @@ export default function OnboardingScreen() {
   // Android's back button steps back through onboarding instead of leaving the app.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (signingIn) {
+        setSigningIn(false);
+        return true;
+      }
       if (step === 0) return false;
-      setStep((s) => s - 1);
+      setStep((s) => (s === 5 && (!cloud.configured || hasAccount) ? 3 : s - 1));
       return true;
     });
     return () => sub.remove();
-  }, [step]);
-
-  const submitAccount = async () => {
-    const error = validateIdentifier(method, identifier) ?? validatePassword(password);
-    setAccountError(error);
-    if (error) return;
-    setSaving(true);
-    try {
-      setAccount(await createAccount(method, identifier, password));
-      feedback('complete');
-      goTo(5);
-    } catch {
-      setAccountError('Couldn’t save your account on this device. Try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [step, signingIn, cloud.configured, hasAccount]);
 
   const finish = async (reminders: boolean) => {
     const allowed = reminders ? await ensurePermission(true) : false;
@@ -412,70 +394,23 @@ export default function OnboardingScreen() {
 
     // 4 — Create an account
     <View key="account" style={styles.step}>
-      <ThemedText type="subtitle">Create your account</ThemedText>
+      <ThemedText type="subtitle">Back up your progress</ThemedText>
       <ThemedText themeColor="textSecondary">
-        Keep your habits, streaks and trophies tied to you. Sign up with your email or phone number.
+        Create an account so your habits, streaks and trophies are safe, and follow you to a new
+        phone.
       </ThemedText>
-      <Segmented
-        options={[
-          { value: 'email', label: 'Email' },
-          { value: 'phone', label: 'Phone' },
-        ]}
-        value={method}
-        onChange={(m) => {
-          setMethod(m);
-          setIdentifier('');
-          setAccountError(null);
-        }}
-      />
-      <ThemedView type="backgroundElement" style={styles.inputBox}>
-        <TextInput
-          maxFontSizeMultiplier={1.4}
-          key={method}
-          value={identifier}
-          onChangeText={(v) => {
-            setIdentifier(v);
-            setAccountError(null);
+      <ThemedView type="backgroundElement" style={styles.accountCard}>
+        <CreateAccountForm
+          submitLabel="Create account"
+          onDone={() => {
+            feedback('complete');
+            goTo(5);
           }}
-          placeholder={method === 'email' ? 'you@example.com' : '(555) 123-4567'}
-          placeholderTextColor={theme.textSecondary}
-          keyboardType={method === 'email' ? 'email-address' : 'phone-pad'}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete={method === 'email' ? 'email' : 'tel'}
-          textContentType={method === 'email' ? 'emailAddress' : 'telephoneNumber'}
-          style={[styles.input, { color: theme.text }]}
         />
       </ThemedView>
-      <ThemedView type="backgroundElement" style={[styles.inputBox, styles.row]}>
-        <TextInput
-          maxFontSizeMultiplier={1.4}
-          value={password}
-          onChangeText={(v) => {
-            setPassword(v);
-            setAccountError(null);
-          }}
-          placeholder="Password (8+ characters)"
-          placeholderTextColor={theme.textSecondary}
-          secureTextEntry={!showPassword}
-          autoCapitalize="none"
-          autoComplete="new-password"
-          textContentType="newPassword"
-          style={[styles.input, styles.flex, { color: theme.text }]}
-        />
-        <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={10} style={styles.show}>
-          <ThemedText type="small" style={{ color: theme.accent }}>
-            {showPassword ? 'Hide' : 'Show'}
-          </ThemedText>
-        </Pressable>
-      </ThemedView>
-      {accountError && (
-        <ThemedText type="small" style={{ color: theme.danger }}>
-          {accountError}
-        </ThemedText>
-      )}
       <ThemedText type="small" themeColor="textSecondary">
-        🔒 Your password is encrypted and stored securely on this device.
+        🔒 Your password is encrypted and never stored on this phone. Skip this and your habits are
+        still backed up to a private guest account.
       </ThemedText>
     </View>,
 
@@ -524,14 +459,13 @@ export default function OnboardingScreen() {
     selectedCount ? `Continue with ${selectedCount}` : 'Pick at least one',
     'Accept the challenge ⚔️',
     'Got it',
-    saving ? 'Creating…' : 'Create account',
+    'Create account',
     'Turn on notifications',
   ][step];
-  const canContinue = step === 1 ? selectedCount > 0 && !draft : !saving;
+  const canContinue = step === 1 ? selectedCount > 0 && !draft : true;
 
   const onPrimary = () => {
     if (last) return finish(true);
-    if (step === 4) return submitAccount();
     feedback(step === 2 ? 'complete' : 'tick');
     goTo(step + 1);
   };
@@ -546,10 +480,10 @@ export default function OnboardingScreen() {
       ]}>
       <View style={styles.topBar}>
         <Pressable
-          disabled={step === 0}
-          onPress={() => goTo(step - 1)}
+          disabled={step === 0 && !signingIn}
+          onPress={() => (signingIn ? setSigningIn(false) : goTo(step - 1))}
           hitSlop={12}
-          style={[styles.back, step === 0 && styles.hidden]}>
+          style={[styles.back, step === 0 && !signingIn && styles.hidden]}>
           <ThemedText themeColor="textSecondary">Back</ThemedText>
         </Pressable>
         <View style={styles.dots}>
@@ -571,27 +505,52 @@ export default function OnboardingScreen() {
         ref={scroll}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scroll}>
-        <Animated.View key={step} entering={FadeInRight.duration(280)} style={styles.inner}>
-          {steps[step]}
-        </Animated.View>
+        {signingIn ? (
+          <Animated.View key="signin" entering={FadeInRight.duration(280)} style={styles.inner}>
+            <SignInStep
+              onEmptyAccount={() => {
+                setSigningIn(false);
+                goTo(1);
+              }}
+            />
+          </Animated.View>
+        ) : (
+          <Animated.View key={step} entering={FadeInRight.duration(280)} style={styles.inner}>
+            {steps[step]}
+          </Animated.View>
+        )}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.three }]}>
-        <Pressable
-          disabled={!canContinue}
-          onPress={onPrimary}
-          style={[
-            styles.primary,
-            { backgroundColor: step === 2 ? theme.gold : theme.accent },
-            !canContinue && styles.disabled,
-          ]}>
-          <ThemedText
-            type="smallBold"
-            themeColor={step === 2 ? 'onGold' : 'onAccent'}
-            style={styles.primaryText}>
-            {Platform.OS === 'web' && last ? 'Let’s go' : cta}
-          </ThemedText>
-        </Pressable>
+      <View
+        style={[
+          styles.footer,
+          { paddingBottom: insets.bottom + Spacing.three },
+          signingIn && styles.hidden,
+        ]}>
+        {step !== 4 && (
+          <Pressable
+            disabled={!canContinue}
+            onPress={onPrimary}
+            style={[
+              styles.primary,
+              { backgroundColor: step === 2 ? theme.gold : theme.accent },
+              !canContinue && styles.disabled,
+            ]}>
+            <ThemedText
+              type="smallBold"
+              themeColor={step === 2 ? 'onGold' : 'onAccent'}
+              style={styles.primaryText}>
+              {Platform.OS === 'web' && last ? 'Let’s go' : cta}
+            </ThemedText>
+          </Pressable>
+        )}
+        {step === 0 && cloud.configured && !hasAccount && (
+          <Pressable onPress={() => setSigningIn(true)} style={styles.secondary}>
+            <ThemedText type="small" style={{ color: theme.accent }}>
+              I already have an account
+            </ThemedText>
+          </Pressable>
+        )}
         {step === 4 && (
           <Pressable onPress={() => goTo(5)} style={styles.secondary}>
             <ThemedText type="small" themeColor="textSecondary">
@@ -608,6 +567,49 @@ export default function OnboardingScreen() {
         )}
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+/** Sign in from the welcome screen; onboarding closes itself once the account's habits load. */
+function SignInStep({ onEmptyAccount }: { onEmptyAccount: () => void }) {
+  const theme = useTheme();
+  const cloud = useCloud();
+  const [done, setDone] = useState(false);
+
+  if (done && cloud.user && !cloud.user.anonymous)
+    return (
+      <View style={styles.centerStep}>
+        <ThemedText style={styles.heroEmoji}>{cloud.status === 'synced' ? '🌱' : '☁️'}</ThemedText>
+        <ThemedText type="subtitle" style={styles.center}>
+          {cloud.status === 'synced' ? 'You’re signed in' : 'Loading your habits…'}
+        </ThemedText>
+        <ThemedText themeColor="textSecondary" style={styles.center}>
+          {cloud.status === 'offline'
+            ? 'You’re signed in. Your habits will appear as soon as you’re back online.'
+            : cloud.status === 'synced'
+              ? 'Your account doesn’t have any habits yet. Let’s set some up.'
+              : 'This only takes a moment.'}
+        </ThemedText>
+        {cloud.status === 'synced' && (
+          <Pressable onPress={onEmptyAccount} style={styles.secondary}>
+            <ThemedText type="smallBold" style={{ color: theme.accent }}>
+              Pick my habits
+            </ThemedText>
+          </Pressable>
+        )}
+      </View>
+    );
+
+  return (
+    <View style={styles.step}>
+      <ThemedText type="subtitle">Welcome back</ThemedText>
+      <ThemedText themeColor="textSecondary">
+        Sign in to pick up your habits, streaks and trophies where you left off.
+      </ThemedText>
+      <ThemedView type="backgroundElement" style={styles.accountCard}>
+        <SignInForm onDone={() => setDone(true)} />
+      </ThemedView>
+    </View>
   );
 }
 
@@ -844,16 +846,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
   },
-  inputBox: {
-    borderRadius: Spacing.four,
-  },
-  input: {
-    fontSize: 16,
-    padding: Spacing.three,
-  },
-  show: {
-    paddingRight: Spacing.three,
-  },
   notif: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -867,6 +859,10 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  accountCard: {
+    borderRadius: Spacing.four,
+    padding: Spacing.three,
   },
   footer: {
     paddingHorizontal: Spacing.four,

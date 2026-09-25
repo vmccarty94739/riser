@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Riser is a habit tracker headed for the App Store and Google Play (Expo SDK 57, React Native 0.86, Expo Router, TypeScript strict, React Compiler on). Day-to-day development runs in **Expo Go**, so only modules bundled in Expo Go may be added. Store binaries are built in the cloud with EAS. All data stays on the device; there is no backend.
+Riser is a habit tracker headed for the App Store and Google Play (Expo SDK 57, React Native 0.86, Expo Router, TypeScript strict, React Compiler on). Day-to-day development runs in **Expo Go**, so only modules bundled in Expo Go may be added. Store binaries are built in the cloud with EAS. The backend is **Supabase** (Postgres + Auth). The app is offline-first: the local store is always the UI's source of truth, and Supabase is synced in the background.
 
 ## Commands
 
@@ -30,6 +30,7 @@ Release builds (`eas init/build/submit`) are listed in `README.md`. The store co
 
 ## Environment gotchas
 
+- Supabase config comes from `.env` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` = the publishable key; see `.env.example`). Without it, `cloudConfigured` is false and the app runs local-only with account UI hidden, which is also how the tests run. The schema lives in `supabase/migrations/`. There is no Supabase CLI link, so migrations are applied by pasting them into the dashboard SQL Editor. When the schema changes, add a new migration file; never edit an applied one.
 - Typed routes (`.expo/types`) regenerate only when the dev server starts. After adding or renaming a route, `tsc` reports stale `href` errors until `npx expo start` has run once.
 - Tunnel mode needs global `@expo/ngrok`, and the Expo CLI must be logged in as the same account signed into Expo Go.
 - Tests live in `src/lib/__tests__/` and import their globals from `@jest/globals`, because the Expo tsconfig doesn't expose jest globals. `helpers.ts` freezes "today" at `2026-09-24` with fake timers. AsyncStorage and `.css` are mapped to mocks in the `jest` block of `package.json`.
@@ -43,12 +44,12 @@ The user designs by five layers; check new work against them: **core function** 
 ## Architecture
 
 ### Navigation and providers
-- The root `_layout.tsx` wraps everything in `HabitsProvider` → `NavigationTheme` (the expo-router `ThemeProvider`, fed from `useTheme()`) → `RewardsProvider`. Inside it: `AppearanceSync` (applies the light/dark setting via `Appearance.setColorScheme` and the system background), a `Stack` with `Stack.Protected` guards on `onboarded`, `ReminderSync`, `StatusBar`, and `AnimatedSplashOverlay`, which fades out the branded splash.
+- The root `_layout.tsx` wraps everything in `HabitsProvider` → `CloudProvider` → `NavigationTheme` (the expo-router `ThemeProvider`, fed from `useTheme()`) → `RewardsProvider`. Inside it: `AppearanceSync` (applies the light/dark setting via `Appearance.setColorScheme` and the system background), a `Stack` with `Stack.Protected` guards on `onboarded`, `ReminderSync`, `StatusBar`, and `AnimatedSplashOverlay`, which fades out the branded splash.
 - Routes: `onboarding.tsx`, then the `(tabs)` group (`index` Dashboard, `progress` Progress Report, `photos` Camera Roll), plus the modal routes `new-habit`, `new-challenge`, `habit/[id]` (`?edit=1` opens in edit mode) and `settings`. Modals render inside `sheet-screen.tsx`; tab screens inside `screen-scroll.tsx`, which handles the safe area, tab-bar inset, large title and header `action` slot for `SettingsButton`.
 - Tabs are defined twice: `app-tabs.tsx` (native, `expo-router/unstable-native-tabs`) and `app-tabs.web.tsx`. Update both. The `.web.ts(x)` suffix is Metro's platform-specific resolution.
 
 ### Data
-- **State** is one context in `src/hooks/use-habits.tsx`: `{ onboarded, account, seenLevel, bonusXp, habits, challenges, settings }`, persisted as JSON to AsyncStorage under `riser.store.v3`.
+- **State** is one context in `src/hooks/use-habits.tsx`: `{ onboarded, seenLevel, bonusXp, habits, challenges, settings }`, persisted as JSON to AsyncStorage under `riser.store.v3`. `useStoreAccess()` exposes raw `getStore`/`setStore`, for cloud sync only.
   - **Migration:** older keys (`riser.store.v2`, `riser.habits.v1`) migrate via `upgradeHabit`, and `normalize()` fills in newer fields. If you change a persisted shape, bump the key or migrate.
   - **Load failures:** an unreadable store is copied to a backup key and never overwritten.
   - **Side effects:** keep them, such as proof-file deletes, out of state updaters.
@@ -79,8 +80,26 @@ The user designs by five layers; check new work against them: **core function** 
 - **`src/lib/reminders.ts`** uses local notifications only.
   - `planReminders` builds the next 7 days from live state, capped at 60 (the iOS limit is 64): a morning intention, per-habit times, and an evening nudge that names the streak or challenge at risk and is skipped once everything's done.
   - `syncReminders` runs through a queue with a generation counter, so overlapping syncs can't duplicate notifications. `ReminderSync` re-runs it on every state change and on app foreground.
-- **`src/lib/account.ts`** is an on-device account, since there's no backend. The password is salted, SHA-256 hashed and kept in expo-secure-store; only `{ method, identifier }` goes in the store. "Sign out & delete account" is the in-app deletion Apple requires. Swap in a real auth provider before adding sync.
 - **Proof photos** (`src/lib/proofs.ts`) are copied into `Documents/proofs/` and stored by file name only, because iOS container paths change between updates. Resolve them with `proofUri()`.
+
+### Cloud sync and auth (Supabase)
+- **Tables:**
+  - `profiles` holds `seen_level` and the `settings` jsonb. `habits`, `checkins` (one row per habit per day; a count of 0 means un-checked) and `challenges` are keyed by `(user_id, id)` and keep the app's own string ids.
+  - RLS limits every row to `auth.uid()`. The server sets `updated_at` with a trigger. Habits and challenges are soft-deleted (`deleted_at`) so deletions reach other devices.
+  - `delete_account()` (security definer) deletes the auth user, and the foreign keys cascade to every row.
+  - Proof photos and `bonusXp` never sync. `onboarded` doesn't sync either: signing in sets it from whether the account has data.
+- **`src/lib/sync.ts`** is pure and unit-tested. A `Snapshot` records what the cloud holds per record.
+  - `diff(state, snapshot)` gives the pending changes. There's no outbox, so edits made offline survive restarts automatically.
+  - `mergeRemote` applies pulled rows but skips records with pending local edits (local wins and is pushed next). It returns the *same* state object when nothing changed; that is what keeps pull → setStore → push from looping.
+  - `replace` mode is for signing in on a new phone.
+- **`src/lib/cloud.ts`** does the network side: `push` (habits before check-ins because of the foreign key; chunked upserts) and `pull` (paged rows since a cursor, re-reading 60s before it).
+- **`src/hooks/use-cloud.tsx`** (`CloudProvider`, `useCloud()`):
+  - It owns the session, silent anonymous sign-in once onboarding is done, and sync triggers: pull + push on session start and foreground, push 1.5s after local edits, and backoff retries while offline.
+  - Sync metadata (`userId`, `cursor`, `snapshot`, `replace`) lives in AsyncStorage under `riser.sync.v1`. An `epoch` counter plus a `switching` flag stop in-flight syncs from writing across account switches.
+  - "Create account" upgrades the anonymous user in place: `updateUser({ email })`, then `{ password }`. If Supabase requires email confirmation, the form asks for the emailed code.
+  - `signIn` / `resetPassword` (OTP code) mark the next pull as `replace`.
+  - `signOut` and `deleteEverything` wipe local data and return to onboarding.
+- Supabase error messages go through `authMessage()` in `src/lib/auth.ts`. Forms live in `src/components/auth-forms.tsx` and are shared by Settings' `AccountCard` and onboarding.
 
 ### UI conventions
 - **Colors** come from `Colors` in `src/constants/theme.ts`; every key must exist in both light and dark.
@@ -103,7 +122,7 @@ The user designs by five layers; check new work against them: **core function** 
   - No microphone, background audio, Face ID or media-playback foreground service. `android.blockedPermissions` backs this up.
   - Camera and photo-library permissions carry explanation text.
   - The notification icon and color are set.
-  - `ios.privacyManifests` aggregates the required-reason APIs the bundled libraries declare.
+  - `ios.privacyManifests` aggregates the required-reason APIs the bundled libraries declare. It also declares the collected data (email, user ID, user content; linked, not tracking), which must match the App Store privacy answers in `store/STORE_LISTING.md` and `store/PRIVACY_POLICY.md`.
 - `plugins/with-local-notifications-only.js` strips the unused push (`aps-environment`) entitlement. It must stay **first** in the plugin list, because entitlement mods run in reverse order.
 - Verify config changes with `npx expo config --type introspect` or a scratch-copy `npx expo prebuild`.
 - Brand artwork is generated by `scripts/art/make-art.js`, which needs `@resvg/resvg-js` installed outside the project. The iOS icon and the Play feature graphic must have no alpha channel.

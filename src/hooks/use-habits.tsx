@@ -1,7 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, use, useEffect, useState, type PropsWithChildren } from 'react';
+import {
+  createContext,
+  use,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type PropsWithChildren,
+  type SetStateAction,
+} from 'react';
 
-import { deleteAccount, type Account } from '@/lib/account';
 import { clockOffset, setClockOffset } from '@/lib/clock';
 import {
   addDays,
@@ -19,10 +27,8 @@ const STORAGE_KEY = 'riser.store.v3';
 const V2_KEY = 'riser.store.v2';
 const V1_KEY = 'riser.habits.v1';
 
-type Store = {
+export type Store = {
   onboarded: boolean;
-  /** Public part of the on-device account (the password hash lives in SecureStore). */
-  account: Account | null;
   /** Highest level already celebrated, so each level-up plays once. Null until first measured. */
   seenLevel: number | null;
   /** Developer-only XP added on top of the derived total. */
@@ -47,9 +53,8 @@ export const DEFAULT_SETTINGS: Settings = {
   collapsed: [],
 };
 
-const EMPTY: Store = {
+export const EMPTY_STORE: Store = {
   onboarded: false,
-  account: null,
   seenLevel: null,
   bonusXp: 0,
   habits: [],
@@ -77,9 +82,7 @@ type HabitsContextValue = Store & {
   updateSettings: (patch: Partial<Settings>) => void;
   toggleCollapsed: (key: string) => void;
   setOnboarded: (onboarded: boolean) => void;
-  setAccount: (account: Account | null) => void;
   setSeenLevel: (level: number) => void;
-  resetAll: () => void;
   dev: {
     setOffset: (days: number) => void;
     /** Rewrites a challenge so `daysDone` days are complete and the next one is today. */
@@ -95,6 +98,14 @@ type HabitsContextValue = Store & {
 };
 
 const HabitsContext = createContext<HabitsContextValue | null>(null);
+
+/** Raw store access for cloud sync (`use-cloud.tsx`), which merges pulled rows into it. */
+type StoreAccess = {
+  /** The last committed store. */
+  getStore: () => Store;
+  setStore: Dispatch<SetStateAction<Store>>;
+};
+const StoreAccessContext = createContext<StoreAccess | null>(null);
 
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -124,8 +135,8 @@ function upgradeHabit(h: LegacyHabit): Habit {
   };
 }
 
-/** Fills fields added after a store was first saved. */
-function normalize(s: Store): Store {
+/** Fills fields added after a store was first saved and drops retired ones. */
+function normalize({ account: _retired, ...s }: Store & { account?: unknown }): Store {
   return {
     ...s,
     seenLevel: s.seenLevel ?? null,
@@ -142,16 +153,16 @@ function normalize(s: Store): Store {
 
 async function loadStore(): Promise<Store> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
-  if (raw) return { ...EMPTY, ...JSON.parse(raw) };
+  if (raw) return { ...EMPTY_STORE, ...JSON.parse(raw) };
   // v2 had a single `reminder` and no kind/note/proofs.
   const v2 = await AsyncStorage.getItem(V2_KEY);
   if (v2) {
     const s = JSON.parse(v2);
-    return { ...EMPTY, ...s, habits: s.habits.map(upgradeHabit) };
+    return { ...EMPTY_STORE, ...s, habits: s.habits.map(upgradeHabit) };
   }
   // v1 stored `completions: string[]` and nothing else.
   const v1 = await AsyncStorage.getItem(V1_KEY);
-  return v1 ? { ...EMPTY, habits: JSON.parse(v1).map(upgradeHabit) } : EMPTY;
+  return v1 ? { ...EMPTY_STORE, habits: JSON.parse(v1).map(upgradeHabit) } : EMPTY_STORE;
 }
 
 /** 60 days of believable history, including a quit habit and two habits sharing an icon. */
@@ -234,9 +245,8 @@ function demoStore(): Store {
     completedAt: null,
   });
   return {
-    ...EMPTY,
+    ...EMPTY_STORE,
     onboarded: true,
-    account: { method: 'email', identifier: 'alex@example.com' },
     habits,
     challenges: [
       won(water, 3, 20),
@@ -251,7 +261,7 @@ function demoStore(): Store {
 }
 
 export function HabitsProvider({ children }: PropsWithChildren) {
-  const [store, setStore] = useState<Store>(EMPTY);
+  const [store, setStore] = useState<Store>(EMPTY_STORE);
   const [loaded, setLoaded] = useState(false);
   const [devOffset, setDevOffset] = useState(clockOffset());
 
@@ -265,7 +275,7 @@ export function HabitsProvider({ children }: PropsWithChildren) {
           await AsyncStorage.setItem(`${STORAGE_KEY}.unreadable-${Date.now()}`, raw).catch(
             () => {}
           );
-        setStore(EMPTY);
+        setStore(EMPTY_STORE);
       })
       .finally(() => setLoaded(true));
   }, []);
@@ -273,6 +283,12 @@ export function HabitsProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (loaded) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(store)).catch(() => {});
   }, [store, loaded]);
+
+  const committed = useRef(store);
+  useEffect(() => {
+    committed.current = store;
+  }, [store]);
+  const [access] = useState<StoreAccess>(() => ({ getStore: () => committed.current, setStore }));
 
   const update = (fn: (s: Store) => Store) => setStore(fn);
   const mapHabit = (id: string, fn: (h: Habit) => Habit) =>
@@ -384,13 +400,7 @@ export function HabitsProvider({ children }: PropsWithChildren) {
         return { ...s, settings: { ...s.settings, collapsed } };
       }),
     setOnboarded: (onboarded) => update((s) => ({ ...s, onboarded })),
-    setAccount: (account) => update((s) => ({ ...s, account })),
     setSeenLevel: (seenLevel) => update((s) => ({ ...s, seenLevel })),
-    resetAll: () => {
-      store.habits.forEach((h) => Object.values(h.proofs).forEach(deleteProof));
-      deleteAccount().catch(() => {});
-      setStore(EMPTY);
-    },
     dev: {
       setOffset: (days) => {
         setClockOffset(days);
@@ -443,7 +453,17 @@ export function HabitsProvider({ children }: PropsWithChildren) {
     },
   };
 
-  return <HabitsContext value={value}>{children}</HabitsContext>;
+  return (
+    <StoreAccessContext value={access}>
+      <HabitsContext value={value}>{children}</HabitsContext>
+    </StoreAccessContext>
+  );
+}
+
+export function useStoreAccess() {
+  const ctx = use(StoreAccessContext);
+  if (!ctx) throw new Error('useStoreAccess must be used inside <HabitsProvider>');
+  return ctx;
 }
 
 export function useHabits() {

@@ -18,6 +18,7 @@ import { SheetScreen } from '@/components/sheet-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { readableText, Spacing, THEME_SWATCHES } from '@/constants/theme';
+import { useCloud } from '@/hooks/use-cloud';
 import { useHabits } from '@/hooks/use-habits';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRewards } from '@/hooks/use-rewards';
@@ -150,7 +151,8 @@ function Row({
 
 export default function SettingsScreen() {
   const theme = useTheme();
-  const { habits, challenges, settings, updateSettings, setOnboarded, resetAll } = useHabits();
+  const { habits, challenges, settings, updateSettings, setOnboarded } = useHabits();
+  const cloud = useCloud();
   const xp = useXp();
   const unlockedCount = THEME_SWATCHES.filter((s) => s.unlockedBy <= xp.level).length;
   const { feedback, playChime } = useRewards();
@@ -377,9 +379,14 @@ export default function SettingsScreen() {
           onPress={() =>
             confirm(
               'Erase everything?',
-              'All habits, history and trophies will be deleted.',
+              cloud.user
+                ? 'All habits, history and trophies will be deleted from this phone and the cloud, along with your account.'
+                : 'All habits, history and trophies will be deleted.',
               'Erase',
-              resetAll
+              () =>
+                cloud
+                  .deleteEverything()
+                  .catch((e: Error) => Alert.alert('Couldn’t erase your data', e.message))
             )
           }
           style={styles.linkRow}>

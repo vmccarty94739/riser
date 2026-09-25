@@ -1,0 +1,389 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { createContext, use, useEffect, useRef, useState, type PropsWithChildren } from 'react';
+import { AppState } from 'react-native';
+
+import { EMPTY_STORE, useHabits, useStoreAccess, type Store } from '@/hooks/use-habits';
+import { authMessage, normalizeEmail } from '@/lib/auth';
+import { deleteRemoteAccount, pull, push } from '@/lib/cloud';
+import { deleteProof } from '@/lib/proofs';
+import { cloudConfigured, supabase } from '@/lib/supabase';
+import {
+  diff,
+  EMPTY_SNAPSHOT,
+  hasChanges,
+  mergeRemote,
+  snapshotOf,
+  type Snapshot,
+} from '@/lib/sync';
+
+/**
+ * Accounts and background sync. The app never waits on the network: screens read the local
+ * store (`use-habits`), and this provider reconciles it with Supabase after changes (debounced),
+ * on launch, when the app returns to the foreground, and on a backoff while offline.
+ *
+ * Everyone gets a Supabase user: an anonymous one is created silently after onboarding, so data
+ * is backed up from day one. "Create account" attaches an email + password to that same user.
+ * "Sign in" on another phone replaces local data with the account's.
+ */
+
+const META_KEY = 'riser.sync.v1';
+const DEBOUNCE_MS = 1500;
+const RETRY_MS = [5_000, 15_000, 60_000, 300_000];
+
+type Meta = {
+  userId: string;
+  /** Latest server `updated_at` seen; pulls ask for rows newer than this. */
+  cursor: string | null;
+  snapshot: Snapshot;
+  /** Set when signing in to an existing account: the next pull replaces local data. */
+  replace: boolean;
+};
+
+const freshMeta = (userId: string, replace = false): Meta => ({
+  userId,
+  cursor: null,
+  snapshot: EMPTY_SNAPSHOT,
+  replace,
+});
+
+export type CloudUser = { id: string; email: string | null; anonymous: boolean };
+export type CloudStatus = 'off' | 'signed-out' | 'syncing' | 'synced' | 'offline';
+/** `verify`: Supabase emailed a code that must be entered with `confirmEmail`. */
+export type CreateResult = 'done' | 'verify-signup' | 'verify-email-change';
+
+type CloudContextValue = {
+  /** False when `.env` has no Supabase project; accounts are hidden and data stays local. */
+  configured: boolean;
+  user: CloudUser | null;
+  status: CloudStatus;
+  lastSynced: number | null;
+  createAccount: (email: string, password: string) => Promise<CreateResult>;
+  confirmEmail: (
+    kind: Exclude<CreateResult, 'done'>,
+    email: string,
+    code: string,
+    password: string
+  ) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  /** Verifies the emailed code, sets the new password and signs in. */
+  resetPassword: (email: string, code: string, password: string) => Promise<void>;
+  /** Uploads pending changes now. Resolves true when everything is in the cloud. */
+  flush: () => Promise<boolean>;
+  signOut: () => Promise<void>;
+  /** Deletes the account, its cloud data and everything on this device. */
+  deleteEverything: () => Promise<void>;
+};
+
+const CloudContext = createContext<CloudContextValue | null>(null);
+
+const toCloudUser = (u: User | null | undefined): CloudUser | null =>
+  u ? { id: u.id, email: u.email ?? null, anonymous: !!u.is_anonymous } : null;
+
+/** Surfaces a Supabase error as a plain sentence. */
+function fail(error: unknown): never {
+  throw new Error(authMessage(error));
+}
+
+export function CloudProvider({ children }: PropsWithChildren) {
+  const { loaded, onboarded, habits, challenges, settings, seenLevel } = useHabits();
+  const { getStore, setStore } = useStoreAccess();
+  const db = supabase();
+
+  const [user, setUser] = useState<CloudUser | null>(null);
+  const [authReady, setAuthReady] = useState(!db);
+  const [status, setStatus] = useState<CloudStatus>('syncing');
+  const [lastSynced, setLastSynced] = useState<number | null>(null);
+
+  const meta = useRef<Meta | null>(null);
+  const [metaReady, setMetaReady] = useState(false);
+  const userRef = useRef<CloudUser | null>(null);
+  /** Bumped on every account switch; a sync that started earlier discards its results. */
+  const epoch = useRef(0);
+  /** True while signing in, so no sync runs against a half-switched account. */
+  const switching = useRef(false);
+  const running = useRef(false);
+  const queued = useRef<{ pull: boolean } | null>(null);
+  const retry = useRef<{ timer: ReturnType<typeof setTimeout> | null; attempt: number }>({
+    timer: null,
+    attempt: 0,
+  });
+
+  const saveMeta = (next: Meta) => {
+    meta.current = next;
+    AsyncStorage.setItem(META_KEY, JSON.stringify(next)).catch(() => {});
+  };
+
+  // Session: restore the saved one, then follow sign-ins, sign-outs and token refreshes.
+  useEffect(() => {
+    if (!db) return;
+    AsyncStorage.getItem(META_KEY)
+      .then((raw) => (meta.current = raw ? JSON.parse(raw) : null))
+      .catch(() => {})
+      .finally(() => setMetaReady(true));
+    db.auth
+      .getSession()
+      .then(({ data }) => {
+        userRef.current = toCloudUser(data.session?.user);
+        setUser(userRef.current);
+      })
+      .finally(() => setAuthReady(true));
+    const { data } = db.auth.onAuthStateChange((_event, session) => {
+      // Never call Supabase from inside this callback; just record the user.
+      userRef.current = toCloudUser(session?.user);
+      setUser(userRef.current);
+    });
+    // Refresh tokens only while the app is on screen, as Supabase recommends for React Native.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') db.auth.startAutoRefresh();
+      else db.auth.stopAutoRefresh();
+    });
+    return () => {
+      data.subscription.unsubscribe();
+      sub.remove();
+    };
+  }, [db]);
+
+  const sync = async (options: { pull: boolean }): Promise<boolean> => {
+    const current = userRef.current;
+    if (!db || !current || !loaded || !metaReady || switching.current) return false;
+    if (running.current) {
+      queued.current = { pull: options.pull || !!queued.current?.pull };
+      return false;
+    }
+    running.current = true;
+    const started = epoch.current;
+    const stale = () => epoch.current !== started || userRef.current?.id !== current.id;
+    if (retry.current.timer) clearTimeout(retry.current.timer);
+    setStatus('syncing');
+    try {
+      let m = meta.current?.userId === current.id ? meta.current : freshMeta(current.id);
+      let state: Store = getStore();
+
+      if (m.replace) {
+        // Signing in on this phone: the account's data replaces whatever was here.
+        const { rows, cursor } = await pull(db, null);
+        if (stale()) return false;
+        const merged = mergeRemote(
+          { ...EMPTY_STORE, settings: state.settings },
+          EMPTY_SNAPSHOT,
+          rows,
+          'replace'
+        );
+        state = { ...merged.state, onboarded: !!rows.profile || rows.habits.length > 0 };
+        getStore().habits.forEach((h) => Object.values(h.proofs).forEach(deleteProof));
+        setStore(state);
+        m = { userId: current.id, cursor, snapshot: merged.snapshot, replace: false };
+        saveMeta(m);
+      } else if (options.pull) {
+        const { rows, cursor } = await pull(db, m.cursor);
+        if (stale()) return false;
+        const base = getStore();
+        const merged = mergeRemote(base, m.snapshot, rows);
+        if (merged.changed) {
+          const snapshot = m.snapshot;
+          setStore((s) => (s === base ? merged.state : mergeRemote(s, snapshot, rows).state));
+        }
+        state = merged.state;
+        m = { ...m, cursor, snapshot: merged.snapshot };
+        saveMeta(m);
+      }
+
+      const changes = diff(state, m.snapshot);
+      if (hasChanges(changes)) {
+        await push(db, current.id, changes);
+        if (stale()) return false;
+        saveMeta({ ...m, snapshot: snapshotOf(state) });
+      }
+      retry.current.attempt = 0;
+      setStatus('synced');
+      setLastSynced(Date.now());
+      return true;
+    } catch {
+      if (stale()) return false;
+      // Offline or a server hiccup: keep the changes and try again with backoff.
+      setStatus('offline');
+      const delay = RETRY_MS[Math.min(retry.current.attempt, RETRY_MS.length - 1)];
+      retry.current.attempt++;
+      retry.current.timer = setTimeout(() => void syncRef.current({ pull: true }), delay);
+      return false;
+    } finally {
+      running.current = false;
+      const next = queued.current;
+      queued.current = null;
+      if (next) void syncRef.current(next);
+    }
+  };
+  // Timers and listeners always call the latest `sync` (it closes over fresh props).
+  const syncRef = useRef(sync);
+  useEffect(() => {
+    syncRef.current = sync;
+  });
+
+  // Back up silently from the moment onboarding is done, with no sign-up required.
+  useEffect(() => {
+    if (!db || !authReady || !loaded || !onboarded || user || switching.current) return;
+    let cancelled = false;
+    const attempt = () =>
+      db.auth.signInAnonymously().then(({ error }) => {
+        if (error && !cancelled) setStatus('offline');
+      });
+    attempt();
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && attempt());
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, [db, authReady, loaded, onboarded, user]);
+
+  // A new session (launch, sign-in, sign-up): pull, then push.
+  useEffect(() => {
+    if (user && loaded && metaReady) void syncRef.current({ pull: true });
+  }, [db, user, loaded, metaReady]);
+
+  // Local edits: push shortly after the user stops tapping.
+  useEffect(() => {
+    if (!user || !loaded) return;
+    const timer = setTimeout(() => void syncRef.current({ pull: false }), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [user, loaded, habits, challenges, settings, seenLevel]);
+
+  // Back in the foreground: pick up changes made on other devices.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncRef.current({ pull: true });
+    });
+    return () => sub.remove();
+  }, []);
+
+  const wipeLocal = () => {
+    epoch.current++;
+    getStore().habits.forEach((h) => Object.values(h.proofs).forEach(deleteProof));
+    setStore(EMPTY_STORE);
+    meta.current = null;
+    AsyncStorage.removeItem(META_KEY).catch(() => {});
+  };
+
+  /** Runs a sign-in, then marks the new account's data to replace this phone's. */
+  const adopt = async (signInStep: (db: SupabaseClient) => Promise<User | null>) => {
+    if (!db) fail({ message: 'Accounts aren’t set up in this build.' });
+    switching.current = true;
+    epoch.current++;
+    try {
+      const signedIn = await signInStep(db);
+      if (!signedIn) fail({});
+      userRef.current = toCloudUser(signedIn);
+      setUser(userRef.current);
+      saveMeta(freshMeta(signedIn.id, true));
+    } finally {
+      switching.current = false;
+    }
+    await syncRef.current({ pull: true });
+  };
+
+  const value: CloudContextValue = {
+    configured: cloudConfigured,
+    user,
+    status: !db ? 'off' : !user ? 'signed-out' : status,
+    lastSynced,
+
+    createAccount: async (rawEmail, password) => {
+      if (!db) fail({ message: 'Accounts aren’t set up in this build.' });
+      const email = normalizeEmail(rawEmail);
+      if (!userRef.current) {
+        // No session yet (during onboarding): a brand-new account.
+        const { data, error } = await db.auth.signUp({ email, password });
+        if (error) fail(error);
+        // Supabase hides "already registered" behind a user with no identities.
+        if (data.user && data.user.identities?.length === 0) fail({ code: 'user_already_exists' });
+        return data.session ? 'done' : 'verify-signup';
+      }
+      // Anonymous user: attach the email (and then the password) to the same user and data.
+      const { data, error } = await db.auth.updateUser({ email });
+      if (error) fail(error);
+      if (data.user.email !== email) return 'verify-email-change';
+      const { error: pwError } = await db.auth.updateUser({ password });
+      if (pwError) fail(pwError);
+      return 'done';
+    },
+
+    confirmEmail: async (kind, rawEmail, code, password) => {
+      if (!db) fail({});
+      const email = normalizeEmail(rawEmail);
+      const type = kind === 'verify-signup' ? 'signup' : 'email_change';
+      const { error } = await db.auth.verifyOtp({ email, token: code.trim(), type });
+      if (error) fail(error);
+      if (kind === 'verify-email-change') {
+        const { error: pwError } = await db.auth.updateUser({ password });
+        if (pwError) fail(pwError);
+      }
+    },
+
+    signIn: (rawEmail, password) =>
+      adopt(async (client) => {
+        const { data, error } = await client.auth.signInWithPassword({
+          email: normalizeEmail(rawEmail),
+          password,
+        });
+        if (error) fail(error);
+        return data.user;
+      }),
+
+    sendPasswordReset: async (rawEmail) => {
+      if (!db) fail({});
+      const { error } = await db.auth.resetPasswordForEmail(normalizeEmail(rawEmail));
+      if (error) fail(error);
+    },
+
+    resetPassword: (rawEmail, code, password) =>
+      adopt(async (client) => {
+        const { data, error } = await client.auth.verifyOtp({
+          email: normalizeEmail(rawEmail),
+          token: code.trim(),
+          type: 'recovery',
+        });
+        if (error) fail(error);
+        const { error: pwError } = await client.auth.updateUser({ password });
+        if (pwError) fail(pwError);
+        return data.user;
+      }),
+
+    flush: async () => {
+      await syncRef.current({ pull: false });
+      const m = meta.current;
+      return (
+        !!m &&
+        m.userId === userRef.current?.id &&
+        !m.replace &&
+        !hasChanges(diff(getStore(), m.snapshot))
+      );
+    },
+
+    signOut: async () => {
+      wipeLocal();
+      // Local scope clears this phone's session even when offline.
+      await db?.auth.signOut({ scope: 'local' }).catch(() => {});
+    },
+
+    deleteEverything: async () => {
+      if (db && userRef.current) {
+        try {
+          await deleteRemoteAccount(db);
+        } catch (error) {
+          fail(error);
+        }
+        await db.auth.signOut({ scope: 'local' }).catch(() => {});
+      }
+      wipeLocal();
+    },
+  };
+
+  return <CloudContext value={value}>{children}</CloudContext>;
+}
+
+export function useCloud() {
+  const ctx = use(CloudContext);
+  if (!ctx) throw new Error('useCloud must be used inside <CloudProvider>');
+  return ctx;
+}

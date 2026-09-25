@@ -2,18 +2,24 @@
 
 _Last updated: September 25, 2026_
 
-Riser is a habit tracker. This policy explains what information the app handles and how. The short version: **everything you put into Riser stays on your device. We don't run servers that receive your data, we don't use analytics or advertising, and we never sell or share your information.**
+Riser is a habit tracker. This policy explains what information the app handles and how. The short version: **your habits are stored on your device and backed up to your private Riser account so you can restore them on a new phone. We don't use analytics or advertising, and we never sell or share your information.**
 
-## Information Riser stores on your device
+## Information Riser handles
 
 | What | Why | Where it lives |
 |---|---|---|
-| Habits, notes, check-ins, streaks, challenges, trophies, XP and settings | To run the app | On your device, in the app's private storage |
-| Proof photos you choose to take or pick | To show your progress in Camera Roll and on each habit | On your device, in the app's private storage |
-| Account email or phone number | To identify your on-device account | On your device, in the app's private storage |
-| Account password | To protect your on-device account | Never stored as typed. Only a salted, one-way hash is kept, in the device's secure keychain/keystore |
+| Habits, notes, check-ins, streaks, challenges, trophies, level and settings | To run the app and back up your progress | On your device, and in your account on our cloud database |
+| Account email address (only if you create an account) | To let you sign in and reset your password | In our authentication service |
+| Account password | To protect your account | Never stored as typed. Only a salted, one-way hash is kept by our authentication service |
+| An anonymous account ID | To link your backed-up data to you, even before you add an email | In our authentication service and cloud database |
+| Proof photos you choose to take or pick | To show your progress in Camera Roll and on each habit | On your device only. Photos are not uploaded |
 
-None of this information is sent to us or to any third party.
+## How your data is stored and protected
+
+- Riser's cloud database and sign-in are provided by **Supabase** (supabase.com), which acts as our data processor and stores the data on our behalf.
+- Data is encrypted in transit (HTTPS) and at rest.
+- Access rules in the database ensure each account can read and change only its own data.
+- We don't sell, rent or share your information with anyone, and we don't use it for advertising.
 
 ## Permissions
 
@@ -27,17 +33,15 @@ You can turn any of these off at any time in your device's settings.
 
 Riser contains no advertising, no analytics or crash-reporting SDKs, and no tracking of any kind. It does not use your data to track you across apps or websites.
 
-## Backups
+## Keeping and deleting your data
 
-Your device's own backup service (for example iCloud Backup or Android backup) may include Riser's app data, according to your device settings. Your account password hash is excluded from Android backups.
+We keep your data for as long as your account exists.
 
-## Deleting your data
-
-- Delete a single habit, check-in or photo from inside the app.
-- Delete your account: **Settings → Account → Sign out & delete account**.
-- Delete everything: **Settings → Erase all data**, or uninstall the app.
-
-Because your data only exists on your device, deleting it there deletes it completely.
+- Delete a single habit, check-in or photo from inside the app. Deletions sync to your account.
+- Delete your account and all of its data: **Settings → Account → Delete account**, or **Settings → Erase all data**. This permanently removes your data from our cloud database and from your device.
+- Signing out removes your data from the device; it stays in your account until you delete it.
+- Guest (anonymous) backups that haven't been used for a long time may be deleted.
+- You can also email us to request deletion of your account and data.
 
 ## Children
 

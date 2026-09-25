@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { validateIdentifier, validatePassword } from '@/lib/account';
+import { authMessage, validateCode, validateEmail, validatePassword } from '@/lib/auth';
 import { BUILD_GROUPS, categoryOf, iconText, QUIT_GROUPS, VAPE_ICON } from '@/lib/icons';
 
 describe('icons', () => {
@@ -22,12 +22,17 @@ describe('icons', () => {
   });
 });
 
-describe('account validation', () => {
-  it('checks emails and phone numbers', () => {
-    expect(validateIdentifier('email', 'me@example.com')).toBeNull();
-    expect(validateIdentifier('email', 'me@example')).not.toBeNull();
-    expect(validateIdentifier('phone', '(555) 123-4567')).toBeNull();
-    expect(validateIdentifier('phone', '555-1234')).not.toBeNull();
+describe('auth forms', () => {
+  it('checks emails and codes', () => {
+    expect(validateEmail(' me@example.com ')).toBeNull();
+    expect(validateEmail('me@example')).not.toBeNull();
+    expect(validateCode('123456')).toBeNull();
+    expect(validateCode('12ab56')).not.toBeNull();
+  });
+
+  it('explains Supabase errors in plain words', () => {
+    expect(authMessage({ code: 'invalid_credentials' })).toMatch(/don’t match/);
+    expect(authMessage({ name: 'AuthRetryableFetchError', status: 0 })).toMatch(/offline/);
   });
 
   it('requires 8+ characters mixing letters and numbers', () => {
