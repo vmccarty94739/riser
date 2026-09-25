@@ -402,6 +402,7 @@ export default function OnboardingScreen() {
       <ThemedView type="backgroundElement" style={styles.accountCard}>
         <CreateAccountForm
           submitLabel="Create account"
+          onSignInInstead={() => setSigningIn(true)}
           onDone={() => {
             feedback('complete');
             goTo(5);

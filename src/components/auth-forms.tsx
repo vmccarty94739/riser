@@ -160,9 +160,12 @@ function useSubmit() {
  */
 export function CreateAccountForm({
   onDone,
+  onSignInInstead,
   submitLabel = 'Create account',
 }: {
   onDone: () => void;
+  /** Shows "I already have an account", which leads to sign-in and password reset. */
+  onSignInInstead?: () => void;
   submitLabel?: string;
 }) {
   const cloud = useCloud();
@@ -218,6 +221,11 @@ export function CreateAccountForm({
       />
       <ErrorText error={error} />
       <PrimaryButton label={submitLabel} busyLabel="Creating…" busy={busy} onPress={create} />
+      {onSignInInstead && (
+        <View style={styles.center}>
+          <LinkButton label="I already have an account" onPress={onSignInInstead} />
+        </View>
+      )}
     </View>
   );
 }
@@ -378,6 +386,9 @@ const styles = StyleSheet.create({
   },
   dim: {
     opacity: 0.5,
+  },
+  center: {
+    alignItems: 'center',
   },
   links: {
     flexDirection: 'row',

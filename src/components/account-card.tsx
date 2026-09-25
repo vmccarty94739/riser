@@ -156,7 +156,10 @@ function Guest() {
       {cloud.configured &&
         (form === 'create' ? (
           <Animated.View entering={FadeIn} style={styles.form}>
-            <CreateAccountForm onDone={() => setForm(null)} />
+            <CreateAccountForm
+              onDone={() => setForm(null)}
+              onSignInInstead={() => setForm('signin')}
+            />
             <LinkButton label="Cancel" onPress={() => setForm(null)} />
           </Animated.View>
         ) : form === 'signin' ? (
