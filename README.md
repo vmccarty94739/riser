@@ -12,7 +12,7 @@ Riser is a habit tracker for iOS and Android, built with Expo (React Native) and
 - **XP and levels.** Each level unlocks new app colors and chimes. XP is shared across your habits, so adding more habits doesn't speed up leveling.
 - **Progress Report.** Includes a trend graph by category, a 16-week calendar heatmap, a report card for every habit, your perfect-day streak and full history.
 - **Camera Roll.** Holds the proof photos attached to completed habits, sorted by date.
-- **AI coach (opt-in).** Each morning it writes a personal nudge from your real streaks. It also writes weekly and monthly reflection reports. Written by Claude (`claude-sonnet-5`) through a Supabase Edge Function.
+- **AI coach (opt-in).** Each morning it writes a personal nudge from your real streaks. It also writes weekly and monthly reflection reports. Written by Claude through a Supabase Edge Function: Haiku 4.5 for the daily nudge, Sonnet 5 for reports.
 - **Reminders.** A morning intention, reminders at times you choose, and an evening nudge only when something is still open. All are local notifications.
 - **Cloud backup and accounts.** Riser backs up to a guest account from the first day, with no sign-up. Add an email and password to sign in on another phone. Includes password reset and in-app account deletion.
 - **Light and dark mode**, with text that stays readable on every unlockable color.

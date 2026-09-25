@@ -25,7 +25,9 @@ import {
   type Kind,
 } from './stats.ts';
 
-const MODEL = 'claude-sonnet-5';
+/** Short daily nudges on the fast, low-cost model; reflections on Sonnet for better analysis. */
+const DAILY_MODEL = 'claude-haiku-4-5';
+const REFLECTION_MODEL = 'claude-sonnet-5';
 /** Safety valve on spend: new messages across all users per 24 hours. */
 const GLOBAL_DAILY_CAP = 3000;
 const PAGE = 1000;
@@ -86,17 +88,17 @@ async function generate(kind: Kind, digest: string) {
   const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
   const content = `${instructions(kind)}\n\n<digest>\n${digest}\n</digest>`;
   const base = {
-    model: MODEL,
     max_tokens: 16000,
-    thinking: { type: 'adaptive' as const },
     system: SYSTEM,
     messages: [{ role: 'user' as const, content }],
   };
 
   if (kind === 'daily') {
+    // Haiku 4.5 has no adaptive thinking or effort setting; a short nudge doesn't need thinking.
     const response = await client.messages.parse({
       ...base,
-      output_config: { effort: 'medium', format: zodOutputFormat(DailySchema) },
+      model: DAILY_MODEL,
+      output_config: { format: zodOutputFormat(DailySchema) },
     });
     const out = response.stop_reason === 'refusal' ? null : response.parsed_output;
     if (!out) return null;
@@ -110,7 +112,9 @@ async function generate(kind: Kind, digest: string) {
 
   const response = await client.messages.parse({
     ...base,
-    output_config: { effort: 'high', format: zodOutputFormat(ReflectionSchema) },
+    model: REFLECTION_MODEL,
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'medium', format: zodOutputFormat(ReflectionSchema) },
   });
   const out = response.stop_reason === 'refusal' ? null : response.parsed_output;
   if (!out) return null;
@@ -190,7 +194,7 @@ Deno.serve(async (req) => {
       period_start: period,
       range_start: digest.range.start,
       range_end: digest.range.end,
-      model: MODEL,
+      model: kind === 'daily' ? DAILY_MODEL : REFLECTION_MODEL,
       ...written,
     };
     // Two simultaneous requests may both generate; the first insert wins and both return it.
