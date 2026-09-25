@@ -91,6 +91,9 @@ const CloudContext = createContext<CloudContextValue | null>(null);
 const toCloudUser = (u: User | null | undefined): CloudUser | null =>
   u ? { id: u.id, email: u.email ?? null, anonymous: !!u.is_anonymous } : null;
 
+const sameUser = (a: CloudUser | null, b: CloudUser | null) =>
+  a?.id === b?.id && a?.email === b?.email && a?.anonymous === b?.anonymous;
+
 /** Surfaces a Supabase error as a plain sentence. */
 function fail(error: unknown): never {
   throw new Error(authMessage(error));
@@ -117,6 +120,8 @@ export function CloudProvider({ children }: PropsWithChildren) {
   /** True while signing in, so no sync runs against a half-switched account. */
   const switching = useRef(false);
   const running = useRef(false);
+  /** The sync in progress, so `flush` can wait for it instead of reporting stale results. */
+  const inflight = useRef<Promise<boolean> | null>(null);
   const queued = useRef<{ pull: boolean } | null>(null);
   const retry = useRef<{ timer: ReturnType<typeof setTimeout> | null; attempt: number }>({
     timer: null,
@@ -139,19 +144,23 @@ export function CloudProvider({ children }: PropsWithChildren) {
       })
       .catch(() => {})
       .finally(() => setMetaReady(true));
+    // Token refreshes also fire this, so only a real change of user counts (else every hourly
+    // refresh would look like a new sign-in and trigger a full sync).
+    const record = (next: CloudUser | null) => {
+      if (sameUser(userRef.current, next)) return;
+      userRef.current = next;
+      setUser(next);
+    };
     db.auth
       .getSession()
-      .then(({ data }) => {
-        userRef.current = toCloudUser(data.session?.user);
-        setUser(userRef.current);
-      })
+      .then(({ data }) => record(toCloudUser(data.session?.user)))
       .finally(() => setAuthReady(true));
     const { data } = db.auth.onAuthStateChange((_event, session) => {
       // Never call Supabase from inside this callback; just record the user.
-      userRef.current = toCloudUser(session?.user);
-      setUser(userRef.current);
+      record(toCloudUser(session?.user));
     });
     // Refresh tokens only while the app is on screen, as Supabase recommends for React Native.
+    if (AppState.currentState === 'active') db.auth.startAutoRefresh();
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') db.auth.startAutoRefresh();
       else db.auth.stopAutoRefresh();
@@ -159,16 +168,25 @@ export function CloudProvider({ children }: PropsWithChildren) {
     return () => {
       data.subscription.unsubscribe();
       sub.remove();
+      db.auth.stopAutoRefresh();
     };
   }, [db]);
 
-  const sync = async (options: { pull: boolean }): Promise<boolean> => {
-    const current = userRef.current;
-    if (!db || !current || !loaded || !metaReady || switching.current) return false;
+  const sync = (options: { pull: boolean }): Promise<boolean> => {
     if (running.current) {
       queued.current = { pull: options.pull || !!queued.current?.pull };
-      return false;
+      return Promise.resolve(false);
     }
+    const run = syncOnce(options).finally(() => {
+      if (inflight.current === run) inflight.current = null;
+    });
+    inflight.current = run;
+    return run;
+  };
+
+  const syncOnce = async (options: { pull: boolean }): Promise<boolean> => {
+    const current = userRef.current;
+    if (!db || !current || !loaded || !metaReady || switching.current) return false;
     running.current = true;
     const started = epoch.current;
     const stale = () => epoch.current !== started || userRef.current?.id !== current.id;
@@ -396,6 +414,8 @@ export function CloudProvider({ children }: PropsWithChildren) {
       }),
 
     flush: async () => {
+      // Let a sync that's already running finish, then upload anything newer.
+      while (inflight.current) await inflight.current;
       await syncRef.current({ pull: false });
       const m = meta.current;
       return (

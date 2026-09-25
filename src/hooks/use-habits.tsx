@@ -97,6 +97,16 @@ type HabitsContextValue = Store & {
   };
 };
 
+const noop = () => {};
+const DEV_DISABLED: HabitsContextValue['dev'] = {
+  setOffset: noop,
+  setChallengeProgress: noop,
+  loadDemo: noop,
+  seedDemo: noop,
+  grantTrophy: noop,
+  addXp: noop,
+};
+
 const HabitsContext = createContext<HabitsContextValue | null>(null);
 
 /** Raw store access for cloud sync (`use-cloud.tsx`), which merges pulled rows into it. */
@@ -401,56 +411,66 @@ export function HabitsProvider({ children }: PropsWithChildren) {
       }),
     setOnboarded: (onboarded) => update((s) => ({ ...s, onboarded })),
     setSeenLevel: (seenLevel) => update((s) => ({ ...s, seenLevel })),
-    dev: {
-      setOffset: (days) => {
-        setClockOffset(days);
-        setDevOffset(days);
-      },
-      setChallengeProgress: (challengeId, daysDone) =>
-        update((s) => {
-          const challenge = s.challenges.find((c) => c.id === challengeId);
-          if (!challenge) return s;
-          const today = dayKey();
-          const startDate = addDays(today, -daysDone);
-          return {
-            ...s,
-            challenges: s.challenges.map((c) => (c.id === challengeId ? { ...c, startDate } : c)),
-            habits: s.habits.map((h) => {
-              if (h.id !== challenge.habitId) return h;
-              const log = { ...h.log };
-              for (let i = 0; i < challenge.length; i++) {
-                const day = addDays(startDate, i);
-                if (i < daysDone) log[day] = h.target;
-                else delete log[day];
-              }
-              return { ...h, createdAt: h.createdAt < startDate ? h.createdAt : startDate, log };
+    // Developer tools only: in release builds these are no-ops, so the demo data and time-travel
+    // helpers are dropped from the bundle.
+    dev: __DEV__
+      ? {
+          setOffset: (days) => {
+            setClockOffset(days);
+            setDevOffset(days);
+          },
+          setChallengeProgress: (challengeId, daysDone) =>
+            update((s) => {
+              const challenge = s.challenges.find((c) => c.id === challengeId);
+              if (!challenge) return s;
+              const today = dayKey();
+              const startDate = addDays(today, -daysDone);
+              return {
+                ...s,
+                challenges: s.challenges.map((c) =>
+                  c.id === challengeId ? { ...c, startDate } : c
+                ),
+                habits: s.habits.map((h) => {
+                  if (h.id !== challenge.habitId) return h;
+                  const log = { ...h.log };
+                  for (let i = 0; i < challenge.length; i++) {
+                    const day = addDays(startDate, i);
+                    if (i < daysDone) log[day] = h.target;
+                    else delete log[day];
+                  }
+                  return {
+                    ...h,
+                    createdAt: h.createdAt < startDate ? h.createdAt : startDate,
+                    log,
+                  };
+                }),
+              };
             }),
-          };
-        }),
-      loadDemo: () => update((s) => ({ ...s, habits: [...s.habits, ...demoHabits()] })),
-      seedDemo: () => setStore(demoStore()),
-      addXp: (amount) => update((s) => ({ ...s, bonusXp: Math.max(0, s.bonusXp + amount) })),
-      grantTrophy: (length) =>
-        update((s) => {
-          const habit = s.habits[0];
-          if (!habit) return s;
-          const today = dayKey();
-          const challenge: Challenge = {
-            id: newId(),
-            habitId: habit.id,
-            habitName: habit.name,
-            habitEmoji: habit.emoji,
-            habitKind: habit.kind,
-            custom: false,
-            title: null,
-            length,
-            startDate: addDays(today, -length),
-            completedAt: today,
-            dismissed: false,
-          };
-          return { ...s, challenges: [...s.challenges, challenge] };
-        }),
-    },
+          loadDemo: () => update((s) => ({ ...s, habits: [...s.habits, ...demoHabits()] })),
+          seedDemo: () => setStore(demoStore()),
+          addXp: (amount) => update((s) => ({ ...s, bonusXp: Math.max(0, s.bonusXp + amount) })),
+          grantTrophy: (length) =>
+            update((s) => {
+              const habit = s.habits[0];
+              if (!habit) return s;
+              const today = dayKey();
+              const challenge: Challenge = {
+                id: newId(),
+                habitId: habit.id,
+                habitName: habit.name,
+                habitEmoji: habit.emoji,
+                habitKind: habit.kind,
+                custom: false,
+                title: null,
+                length,
+                startDate: addDays(today, -length),
+                completedAt: today,
+                dismissed: false,
+              };
+              return { ...s, challenges: [...s.challenges, challenge] };
+            }),
+        }
+      : DEV_DISABLED,
   };
 
   return (

@@ -15,6 +15,7 @@ Node comes from nvm, so in non-interactive shells run `export NVM_DIR="$HOME/.nv
 ```bash
 npx expo start --tunnel                  # dev server (the user's phone can't reach the Mac over LAN)
 npm test                                 # all unit tests (jest-expo)
+npm run test:e2e                         # live sync test: two simulated phones vs the real Supabase project
 npx jest src/lib/__tests__/xp.test.ts    # one test file
 npx jest -t "fair regardless"            # tests whose name matches
 npm run typecheck                        # tsc --noEmit
@@ -35,7 +36,7 @@ Release builds (`eas init/build/submit`) are listed in `README.md`. The store co
 - Tunnel mode needs global `@expo/ngrok`, and the Expo CLI must be logged in as the same account signed into Expo Go.
 - Tests live in `src/lib/__tests__/` and import their globals from `@jest/globals`, because the Expo tsconfig doesn't expose jest globals. `helpers.ts` freezes "today" at `2026-09-24` with fake timers. AsyncStorage and `.css` are mapped to mocks in the `jest` block of `package.json`.
 - Xcode and iOS simulators are installed, but CocoaPods isn't (system Ruby 2.6), so there are no local native builds. For visual QA, run `xcrun simctl openurl booted "exp://127.0.0.1:8081/--/<route>"` against the running dev server. Adding `?seed=demo` loads a lived-in demo account (`DevDemoLink`, dev only).
-- Dev-only code must sit behind `__DEV__` so it is stripped from release bundles: `src/components/dev-tools.tsx` (time travel, challenge shortcuts, XP grants, celebration previews), the demo seed, and `setClockOffset`.
+- Dev-only code must sit behind `__DEV__` so it is stripped from release bundles: `src/components/dev-tools.tsx` (time travel, challenge shortcuts, XP grants, celebration previews), the demo seed, and `setClockOffset`. In `use-habits.tsx`, the `dev` helpers are `__DEV__ ? {…} : DEV_DISABLED`, so the demo data is dropped from release bundles. Check with `grep -ac "Read to the kids"` on an exported `.hbc` bundle.
 
 ## Product framework
 
@@ -86,7 +87,7 @@ The user designs by five layers; check new work against them: **core function** 
 - **Tables:**
   - `profiles` holds `seen_level` and the `settings` jsonb. `habits`, `checkins` (one row per habit per day; a count of 0 means un-checked) and `challenges` are keyed by `(user_id, id)` and keep the app's own string ids.
   - RLS limits every row to `auth.uid()`. The server sets `updated_at` with a trigger.
-  - Deleting a habit or challenge removes its row; a habit's check-ins go with it by cascade. First, a tombstone `(kind, record_id)` is written to `deletions`, which pulls read so other devices drop the record. Saving a record again clears its tombstone. Migrations run in order: `…_init.sql`, then `…_hard_deletes.sql`.
+  - Deleting a habit or challenge removes its row; a habit's check-ins go with it by cascade. First, a tombstone `(kind, record_id)` is written to `deletions`, which pulls read so other devices drop the record. Saving a record again clears its tombstone. Migrations run in order: `…_init.sql`, `…_hard_deletes.sql`, then `…_lock_down_helpers.sql`. The remaining Supabase advisor warnings are intentional: `delete_account` callable by signed-in users, and anonymous sign-ins. Leaked-password protection needs the Pro plan.
   - `delete_account()` (security definer) deletes the auth user, and the foreign keys cascade to every row.
   - Proof photos and `bonusXp` never sync. `onboarded` doesn't sync either: signing in sets it from whether the account has data.
 - **`src/lib/sync.ts`** is pure and unit-tested. A `Snapshot` records what the cloud holds per record.
