@@ -99,6 +99,7 @@ The user designs by five layers; check new work against them: **core function** 
   - "Create account" upgrades the anonymous user in place: `updateUser({ email })`, then `{ password }`. If Supabase requires email confirmation, the form asks for the emailed code.
   - `signIn` / `resetPassword` (OTP code) mark the next pull as `replace`.
   - `signOut` and `deleteEverything` wipe local data and return to onboarding.
+- **Auth emails** go out through Gmail SMTP as `riserapp.support@gmail.com` (the Supabase free plan requires custom SMTP before templates can be edited). The Reset Password template shows `{{ .Token }}`; this project's email codes are 8 digits. "Confirm email" is off and anonymous sign-ins are on.
 - Supabase error messages go through `authMessage()` in `src/lib/auth.ts`. Forms live in `src/components/auth-forms.tsx` and are shared by Settings' `AccountCard` and onboarding.
 
 ### UI conventions

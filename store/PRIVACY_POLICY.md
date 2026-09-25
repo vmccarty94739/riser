@@ -41,7 +41,7 @@ We keep your data for as long as your account exists.
 - Delete your account and all of its data: **Settings → Account → Delete account**, or **Settings → Erase all data**. This permanently removes your data from our cloud database and from your device.
 - Signing out removes your data from the device; it stays in your account until you delete it.
 - Guest (anonymous) backups that haven't been used for a long time may be deleted.
-- You can also email us to request deletion of your account and data.
+- You can also email **riserapp.support@gmail.com** to request deletion of your account and data.
 
 ## Children
 
@@ -53,4 +53,4 @@ If this policy changes, the updated version will be posted at this address with 
 
 ## Contact
 
-Questions about privacy? Email **[CONTACT EMAIL]**.
+Questions about privacy, or want your data deleted? Email **riserapp.support@gmail.com**.

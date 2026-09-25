@@ -74,9 +74,11 @@ No analytics, no ads, no third-party tracking. Proof photos stay on the phone an
 - Is data encrypted in transit? **Yes**. Can users request deletion? **Yes** (Settings → Account → Delete account, or email).
 - Supabase processes the data on your behalf, which counts as a service provider, not "sharing".
 
-**Privacy policy URL** (required by both): host `store/PRIVACY_POLICY.md` publicly (GitHub Pages, a Notion public page, Carrd, etc.). Replace `[CONTACT EMAIL]` first.
+**Privacy policy URL** (required by both): host `store/PRIVACY_POLICY.md` publicly (GitHub Pages, a Notion public page, Carrd, etc.).
 
 **Support URL** (Apple requires one): any public page with a way to contact you.
+
+**Support / contact email**: `riserapp.support@gmail.com`. It's also the sender of Riser's account emails: Gmail SMTP in Supabase, limited to 500 a day. Move to a domain with a service like Resend if the app outgrows that.
 
 ---
 
