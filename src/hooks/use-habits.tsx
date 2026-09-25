@@ -20,6 +20,7 @@ import {
   type Settings,
 } from '@/lib/habits';
 import { deleteProof } from '@/lib/proofs';
+import { NO_DELETIONS, type Deleted } from '@/lib/sync';
 
 export * from '@/lib/habits';
 
@@ -36,6 +37,8 @@ export type Store = {
   habits: Habit[];
   challenges: Challenge[];
   settings: Settings;
+  /** Deletions the cloud hasn't confirmed yet (see `SyncedState.deleted` in `lib/sync.ts`). */
+  deleted: Deleted;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -60,6 +63,7 @@ export const EMPTY_STORE: Store = {
   habits: [],
   challenges: [],
   settings: DEFAULT_SETTINGS,
+  deleted: NO_DELETIONS,
 };
 
 type HabitsContextValue = Store & {
@@ -152,6 +156,7 @@ function normalize({ account: _retired, ...s }: Store & { account?: unknown }): 
     seenLevel: s.seenLevel ?? null,
     bonusXp: s.bonusXp ?? 0,
     settings: { ...DEFAULT_SETTINGS, ...s.settings },
+    deleted: s.deleted ?? NO_DELETIONS,
     challenges: s.challenges.map((c) => ({
       ...c,
       habitKind: c.habitKind ?? s.habits.find((h) => h.id === c.habitId)?.kind ?? 'build',
@@ -365,12 +370,20 @@ export function HabitsProvider({ children }: PropsWithChildren) {
       }),
     removeHabit: (id) => {
       Object.values(store.habits.find((h) => h.id === id)?.proofs ?? {}).forEach(deleteProof);
-      update((s) => ({
-        ...s,
-        habits: s.habits.filter((h) => h.id !== id),
+      update((s) => {
         // Keep won challenges as trophies; drop the rest.
-        challenges: s.challenges.filter((c) => c.habitId !== id || c.completedAt),
-      }));
+        const dropped = s.challenges.filter((c) => c.habitId === id && !c.completedAt);
+        return {
+          ...s,
+          habits: s.habits.filter((h) => h.id !== id),
+          challenges: s.challenges.filter((c) => !dropped.includes(c)),
+          // Recorded with the removal itself, so the deletion reaches the cloud no matter what.
+          deleted: {
+            habits: [...(s.deleted?.habits ?? []), id],
+            challenges: [...(s.deleted?.challenges ?? []), ...dropped.map((c) => c.id)],
+          },
+        };
+      });
     },
     setCount: (id, day, count) =>
       mapHabit(id, (h) => {

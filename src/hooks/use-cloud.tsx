@@ -9,6 +9,7 @@ import { deleteRemoteAccount, pull, push } from '@/lib/cloud';
 import { deleteProof } from '@/lib/proofs';
 import { cloudConfigured, supabase } from '@/lib/supabase';
 import {
+  confirmDeletions,
   diff,
   EMPTY_SNAPSHOT,
   hasChanges,
@@ -121,7 +122,7 @@ function fail(error: unknown): never {
 }
 
 export function CloudProvider({ children }: PropsWithChildren) {
-  const { loaded, onboarded, habits, challenges, settings, seenLevel } = useHabits();
+  const { loaded, onboarded, habits, challenges, settings, seenLevel, deleted } = useHabits();
   const { getStore, setStore } = useStoreAccess();
   const db = supabase();
 
@@ -270,13 +271,32 @@ export function CloudProvider({ children }: PropsWithChildren) {
         await push(db, current.id, changes);
         if (stale()) return false;
         saveMeta({ ...m, snapshot: snapshotOf(state) });
+        // The cloud confirmed these deletions; stop carrying them.
+        if (changes.deletedHabits.length || changes.deletedChallenges.length)
+          setStore((s) => ({ ...s, deleted: confirmDeletions(s.deleted, changes) }));
       }
       retry.current.attempt = 0;
       setStatus('synced');
       setSyncError(null);
       setLastSynced(clockMs());
       setPending(countChanges(diff(getStore(), meta.current?.snapshot ?? EMPTY_SNAPSHOT)));
-      log('synced', options.pull ? '(with download)' : '');
+      if (__DEV__) {
+        // A fingerprint of everything on the phone, to compare against the database.
+        const now = getStore();
+        const checkins = now.habits.flatMap((h) =>
+          Object.entries(h.log).map(([d, n]) => `${h.id}|${d}=${n}`)
+        );
+        log('synced', options.pull ? '(with download)' : '', {
+          habits: now.habits.map((h) => `${h.id}:${h.name}:${h.kind}:${h.target}`).sort(),
+          checkins: checkins.sort(),
+          challenges: now.challenges
+            .map((c) => `${c.id}:${c.length}:${c.startDate}:${c.completedAt ?? '-'}`)
+            .sort(),
+          seenLevel: now.seenLevel,
+          accent: now.settings.accent,
+          waitingDeletions: now.deleted,
+        });
+      }
       return true;
     } catch (error) {
       if (stale()) return false;
@@ -332,10 +352,12 @@ export function CloudProvider({ children }: PropsWithChildren) {
     if (!user || !loaded || !metaReady) return;
     const m = meta.current;
     if (m?.userId === user.id)
-      setPending(countChanges(diff({ habits, challenges, settings, seenLevel }, m.snapshot)));
+      setPending(
+        countChanges(diff({ habits, challenges, settings, seenLevel, deleted }, m.snapshot))
+      );
     const timer = setTimeout(() => void syncRef.current({ pull: false }), DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [user, loaded, metaReady, habits, challenges, settings, seenLevel]);
+  }, [user, loaded, metaReady, habits, challenges, settings, seenLevel, deleted]);
 
   // Back in the foreground, and every minute while open: pick up changes made on other devices.
   // Leaving the app uploads right away, since the phone may suspend it before the debounce fires.

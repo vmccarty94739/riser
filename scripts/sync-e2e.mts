@@ -6,7 +6,14 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { deleteRemoteAccount, pull, push } from '../src/lib/cloud.ts';
-import { diff, EMPTY_SNAPSHOT, hasChanges, mergeRemote, snapshotOf } from '../src/lib/sync.ts';
+import {
+  confirmDeletions,
+  diff,
+  EMPTY_SNAPSHOT,
+  hasChanges,
+  mergeRemote,
+  snapshotOf,
+} from '../src/lib/sync.ts';
 
 const URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY!;
@@ -73,6 +80,7 @@ class Phone {
     if (hasChanges(changes)) {
       await push(this.db, this.uid, changes);
       this.snap = snapshotOf(this.state);
+      this.state = { ...this.state, deleted: confirmDeletions(this.state.deleted, changes) };
     }
   }
   find(id: string) {
@@ -198,6 +206,22 @@ try {
   await A.sync();
   await B.sync();
   ok(B.find('smoke').log[day(0)] === 1, 'Re-check arrives');
+
+  // Durability: delete a habit, then lose the phone's record of what the cloud holds.
+  A.state = {
+    ...A.state,
+    habits: A.state.habits.filter((h: any) => h.id !== 'walk'),
+    deleted: { habits: ['walk'], challenges: [] },
+  };
+  A.snap = EMPTY_SNAPSHOT;
+  A.cursor = null;
+  await A.sync();
+  ok(!A.find('walk'), 'Lost sync record: the deleted habit does not come back');
+  const walk = await db.from('habits').select('id').eq('id', 'walk');
+  ok(walk.data!.length === 0, 'Lost sync record: the deletion still reaches the database');
+  ok(A.state.deleted.habits.length === 0, 'Confirmed deletions are no longer carried');
+  await B.sync();
+  ok(!B.find('walk'), 'The other phone removes it too');
 
   await A.sync();
   await B.sync();

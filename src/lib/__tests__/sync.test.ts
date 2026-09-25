@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import { DEFAULT_SETTINGS } from '@/hooks/use-habits';
 import {
+  confirmDeletions,
   diff,
   EMPTY_SNAPSHOT,
   habitRow,
@@ -162,5 +163,46 @@ describe('sync merge', () => {
     expect(result.state.habits.map((h) => h.name)).toEqual(['From account']);
     expect(result.state.seenLevel).toBe(9);
     expect(result.state.settings.accent).toBe('teal');
+  });
+
+  it('never brings back a habit deleted here, even if the snapshot was lost', () => {
+    const kept = habit({ id: 'keep' });
+    const gone = habit({ id: 'gone', name: 'Pay gorn' });
+    // The phone deleted "gone", but its record of what the cloud holds is empty (lost/stale).
+    const phone = state({ habits: [kept], deleted: { habits: ['gone'], challenges: [] } });
+    const result = mergeRemote(
+      phone,
+      EMPTY_SNAPSHOT,
+      remote({ habits: [habitRow(kept), habitRow(gone)] })
+    );
+    expect(result.state.habits.map((h) => h.id)).toEqual(['keep']);
+    // …and the deletion is still sent.
+    expect(diff(result.state, result.snapshot).deletedHabits).toEqual(['gone']);
+  });
+
+  it('sends a deletion recorded here even when the snapshot never knew the record', () => {
+    const phone = state({ deleted: { habits: ['h9'], challenges: ['c9'] } });
+    const changes = diff(phone, EMPTY_SNAPSHOT);
+    expect(changes.deletedHabits).toEqual(['h9']);
+    expect(changes.deletedChallenges).toEqual(['c9']);
+  });
+
+  it('only forgets deletions the cloud confirmed, keeping ones made meanwhile', () => {
+    const sent = diff(state({ deleted: { habits: ['a'], challenges: [] } }), EMPTY_SNAPSHOT);
+    expect(confirmDeletions({ habits: ['a', 'b'], challenges: ['x'] }, sent)).toEqual({
+      habits: ['b'],
+      challenges: ['x'],
+    });
+  });
+
+  it('replace mode (signing in to another account) ignores this phone’s deletions', () => {
+    const acct = habit({ id: 'gone', name: 'From account' });
+    const result = mergeRemote(
+      state({ deleted: { habits: ['gone'], challenges: [] } }),
+      EMPTY_SNAPSHOT,
+      remote({ habits: [habitRow(acct)] }),
+      'replace'
+    );
+    expect(result.state.habits.map((h) => h.id)).toEqual(['gone']);
   });
 });

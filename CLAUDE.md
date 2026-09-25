@@ -92,6 +92,7 @@ The user designs by five layers; check new work against them: **core function** 
   - Proof photos and `bonusXp` never sync. `onboarded` doesn't sync either: signing in sets it from whether the account has data.
 - **`src/lib/sync.ts`** is pure and unit-tested. A `Snapshot` records what the cloud holds per record.
   - `diff(state, snapshot)` gives the pending changes. There's no outbox, so edits made offline survive restarts automatically.
+  - Deletions are also recorded in `store.deleted` (saved with the data they remove). `diff` always sends them, and `mergeRemote` never re-adds them, so a lost or stale snapshot can't resurrect a deleted record. They're cleared with `confirmDeletions` after the cloud confirms.
   - `mergeRemote` applies pulled rows but skips records with pending local edits (local wins and is pushed next). It returns the *same* state object when nothing changed; that is what keeps pull → setStore → push from looping.
   - `replace` mode is for signing in on a new phone.
 - **`src/lib/cloud.ts`** does the network side:

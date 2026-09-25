@@ -13,13 +13,26 @@ import type { Challenge, Habit, Settings } from '@/lib/habits';
  * The network half lives in `src/lib/cloud.ts`; the React wiring in `src/hooks/use-cloud.tsx`.
  */
 
+/** Ids deleted on this phone whose deletion the cloud hasn't confirmed yet. */
+export type Deleted = { habits: string[]; challenges: string[] };
+
+export const NO_DELETIONS: Deleted = { habits: [], challenges: [] };
+
 /** The parts of the app store that sync. Proof photos, dev XP and onboarding stay on the device. */
 export type SyncedState = {
   seenLevel: number | null;
   habits: Habit[];
   challenges: Challenge[];
   settings: Settings;
+  /**
+   * Deletions waiting for the cloud. They're saved with the data they remove (not only implied by
+   * the snapshot), so a lost or stale snapshot can never bring a deleted record back, and the
+   * deletion keeps retrying until the cloud confirms it.
+   */
+  deleted?: Deleted;
 };
+
+const unique = (ids: string[]) => [...new Set(ids)];
 
 export type HabitRow = {
   id: string;
@@ -170,7 +183,10 @@ export function snapshotOf(state: SyncedState): Snapshot {
 export function diff(state: SyncedState, snap: Snapshot): Changes {
   const habits = state.habits.map(habitRow).filter((r) => snap.habits[r.id] !== habitJson(r));
   const live = new Set(state.habits.map((h) => h.id));
-  const deletedHabits = Object.keys(snap.habits).filter((id) => !live.has(id));
+  const deletedHabits = unique([
+    ...Object.keys(snap.habits),
+    ...(state.deleted?.habits ?? []),
+  ]).filter((id) => !live.has(id));
 
   const checkins: CheckinRow[] = [];
   for (const h of state.habits)
@@ -188,7 +204,10 @@ export function diff(state: SyncedState, snap: Snapshot): Changes {
     .map(challengeRow)
     .filter((r) => snap.challenges[r.id] !== challengeJson(r));
   const liveChallenges = new Set(state.challenges.map((c) => c.id));
-  const deletedChallenges = Object.keys(snap.challenges).filter((id) => !liveChallenges.has(id));
+  const deletedChallenges = unique([
+    ...Object.keys(snap.challenges),
+    ...(state.deleted?.challenges ?? []),
+  ]).filter((id) => !liveChallenges.has(id));
 
   const profile = profileRow(state);
   return {
@@ -221,6 +240,11 @@ export function mergeRemote<S extends SyncedState>(
   mode: 'merge' | 'replace' = 'merge'
 ): { state: S; snapshot: Snapshot; changed: boolean } {
   const force = mode === 'replace';
+  // Records deleted here stay deleted, whatever the snapshot says, until the cloud confirms it.
+  const deletedHere = {
+    habits: new Set(force ? [] : (state.deleted?.habits ?? [])),
+    challenges: new Set(force ? [] : (state.deleted?.challenges ?? [])),
+  };
   let habits = [...state.habits];
   let challenges = [...state.challenges];
   const snapshot: Snapshot = {
@@ -232,6 +256,7 @@ export function mergeRemote<S extends SyncedState>(
   let changed = false;
 
   for (const r of remote.habits) {
+    if (deletedHere.habits.has(r.id)) continue;
     const json = habitJson(r);
     const index = habits.findIndex((h) => h.id === r.id);
     const local = habits[index];
@@ -272,6 +297,7 @@ export function mergeRemote<S extends SyncedState>(
   }
 
   for (const r of remote.challenges) {
+    if (deletedHere.challenges.has(r.id)) continue;
     const json = challengeJson(r);
     const index = challenges.findIndex((c) => c.id === r.id);
     const local = challenges[index];
@@ -327,4 +353,13 @@ export function mergeRemote<S extends SyncedState>(
   }
 
   return { state: next, snapshot, changed };
+}
+
+/** `deleted` minus the ids the cloud just confirmed (deletions made meanwhile are kept). */
+export function confirmDeletions(deleted: Deleted | undefined, sent: Changes): Deleted {
+  const current = deleted ?? NO_DELETIONS;
+  return {
+    habits: current.habits.filter((id) => !sent.deletedHabits.includes(id)),
+    challenges: current.challenges.filter((id) => !sent.deletedChallenges.includes(id)),
+  };
 }
