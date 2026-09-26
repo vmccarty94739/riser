@@ -25,7 +25,7 @@ export const DAILY_SCHEMA: Schema = {
   tip: {
     type: 'string',
     description:
-      'One practical thing to do today for a named habit, specific to that habit, at most 140 characters.',
+      'A concrete plan for a named habit, at most 200 characters: what, when (tied to a time or routine), and a smaller fallback.',
   },
 };
 
@@ -51,14 +51,27 @@ export const REFLECTION_SCHEMA: Schema = {
 };
 
 export const REWORD_SCHEMA: Schema = {
-  title: { type: 'string', description: 'A short headline, at most 50 characters.' },
+  title: {
+    type: 'string',
+    description: 'A specific headline about the pattern, at most 60 characters.',
+  },
   message: {
     type: 'string',
-    description: '1-3 sentences, at most 260 characters, spoken directly to the person.',
+    description:
+      '2-4 sentences, at most 420 characters: the pattern you found (with its numbers), how it connects to another fact from the digest, and why it matters today.',
   },
   tip: {
     type: 'string',
-    description: 'The same practical tip in your own words, at most 170 characters.',
+    description:
+      'A concrete plan for that habit, at most 240 characters: what to do, when (tied to a time or an existing routine), and a smaller fallback for a hard day.',
+  },
+};
+
+export const PUSH_SCHEMA: Schema = {
+  message: {
+    type: 'string',
+    description:
+      'The notification text, 2-3 sentences, at most 300 characters: what you noticed (with a number), why it matters, and one quick, easy action for today.',
   },
 };
 
@@ -100,50 +113,88 @@ function namesAHabit(tip: string, digest: Digest) {
   );
 }
 
-/**
- * One insight (see `coach-insights.ts`) rewritten by the phone's model in a warmer, more personal
- * voice. The facts and advice stay the same: every number must come from the insight, and it must
- * still name the habit(s) it's about. Null when unavailable, slow or off-script.
- */
-export async function rewordOnDevice(
-  insight: Insight,
-  name: string,
-  timeoutMs = 8000
-): Promise<Pick<Written, 'title' | 'body' | 'tip'> | null> {
+/** Asks the phone's model for JSON against `schema`, or null if it's unavailable or too slow. */
+async function ask(prompt: string, schema: Schema, timeoutMs: number, temperature = 0.7) {
   if (!deviceModelReady()) return null;
-  const draft = `Title: ${insight.title}\nMessage: ${insight.body}\nTip: ${insight.tip}`;
-  const prompt = [
-    `Rewrite this coaching note for ${name || 'the person'} in your own words, like a warm personal coach who knows them. Keep the same observation and the same advice. Put every habit name in double quotes, exactly as written. Use only the numbers that appear below; don't add new facts, numbers or habits.`,
-    `<note>\n${draft}\n</note>`,
-    insight.facts ? `<facts>\n${insight.facts}\n</facts>` : '',
-  ].join('\n\n');
   try {
     const raw = await Promise.race([
       generate(prompt, {
         instructions: SYSTEM,
         responseFormat: 'json',
-        schema: REWORD_SCHEMA,
-        options: { temperature: 0.7 },
+        schema,
+        options: { temperature },
       }),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
     ]);
-    if (!raw) return null;
-    const out = JSON.parse(raw) as Record<string, unknown>;
-    const title = text(out.title);
-    const body = text(out.message);
-    const tip = text(out.tip);
-    if (!title || !body || !tip) return null;
-    if (title.length > 70 || body.length > 320 || tip.length > 220) return null;
-    if (!numbersAreReal(`${title} ${body} ${tip}`, `${draft}\n${insight.facts}`)) return null;
-    // It must still be about the same habit(s): every quoted name in the draft's message.
-    const plain = (t: string) => t.replace(/[“”"]/g, '').toLowerCase();
-    const names = [...insight.body.matchAll(/“([^”]+)”/g)].map((m) => m[1].toLowerCase());
-    const said = plain(`${title} ${body} ${tip}`);
-    if (!names.every((n) => said.includes(n))) return null;
-    return { title, body, tip };
+    return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
   } catch {
     return null;
   }
+}
+
+/** The digest, trimmed so the prompt fits small on-device context windows. */
+const context = (digest: string) => (digest.length > 5000 ? `${digest.slice(0, 5000)}\n…` : digest);
+
+/** Habit names quoted in the insight's message: the answer must still be about them. */
+function keepsSubject(answer: string, insight: Insight) {
+  const said = answer.replace(/[“”"]/g, '').toLowerCase();
+  return [...insight.body.matchAll(/“([^”]+)”/g)].every((m) => said.includes(m[1].toLowerCase()));
+}
+
+/**
+ * One insight (see `coach-insights.ts`) turned into a thorough, personal piece of coaching by the
+ * phone's model. It gets the insight as a starting point plus the full digest, so it can connect
+ * more of the person's data. Every number must come from those, and it must still be about the
+ * same habit(s). Null when unavailable, slow or off-script (the caller keeps the rules version).
+ */
+export async function rewordOnDevice(
+  insight: Insight,
+  name: string,
+  digest: string,
+  timeoutMs = 12_000
+): Promise<Pick<Written, 'title' | 'body' | 'tip'> | null> {
+  const draft = `Title: ${insight.title}\nMessage: ${insight.body}\nTip: ${insight.tip}`;
+  const prompt = [
+    `Write ${name || 'this person'}'s coaching for this visit to the app. The note below is the main pattern our analysis found; it's your starting point, not your limit. Study the digest, confirm the pattern, and deepen it: connect it to at least one more fact from the digest (a weekday pattern, a trend, a streak or record, another habit), explain why it matters today, and turn the tip into a specific plan with a fallback for a hard day. Follow THE STANDARD.`,
+    'Put every habit name in double quotes, exactly as written. Use only numbers that appear in the note or the digest.',
+    `<note>\n${draft}\n</note>`,
+    `<digest>\n${context(digest)}\n</digest>`,
+  ].join('\n\n');
+  const out = await ask(prompt, REWORD_SCHEMA, timeoutMs);
+  if (!out) return null;
+  const title = text(out.title);
+  const body = text(out.message);
+  const tip = text(out.tip);
+  if (!title || !body || !tip) return null;
+  if (title.length > 80 || body.length > 520 || tip.length > 300) return null;
+  const all = `${title} ${body} ${tip}`;
+  if (!numbersAreReal(all, `${draft}\n${insight.facts}\n${digest}`)) return null;
+  if (!keepsSubject(all, insight)) return null;
+  return { title, body, tip };
+}
+
+/**
+ * The afternoon notification for one insight, written by the phone's model: a short, complete
+ * thought from a coach who studied the data ("Hey Vaden, I noticed…"). Null → the rules text.
+ */
+export async function rewordPushOnDevice(
+  insight: Insight,
+  name: string,
+  digest: string,
+  timeoutMs = 12_000
+): Promise<string | null> {
+  const prompt = [
+    `Write the afternoon notification your coach sends ${name || 'this person'} while they're out living their day. The draft below is what our analysis found; make it sound deeply thought out: what you noticed in their data (with a real number), why it matters today, and one quick, easy thing they can do right now. ${name ? `Open by addressing ${name} naturally. ` : ''}Follow THE STANDARD. It must read well on a lock screen: 2-3 sentences, no lists.`,
+    'Put every habit name in double quotes, exactly as written. Use only numbers that appear in the draft or the digest.',
+    `<draft>\n${insight.push}\n</draft>`,
+    `<digest>\n${context(digest)}\n</digest>`,
+  ].join('\n\n');
+  const out = await ask(prompt, PUSH_SCHEMA, timeoutMs);
+  const message = out ? text(out.message) : '';
+  if (!message || message.length > 360) return null;
+  if (!numbersAreReal(message, `${insight.push}\n${insight.facts}\n${digest}`)) return null;
+  if (!keepsSubject(message, insight)) return null;
+  return message;
 }
 
 /** A message from the phone's model, or null (unavailable, timed out, or failed the checks). */

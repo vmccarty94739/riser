@@ -158,6 +158,11 @@ function toRows(today: string, { habits, challenges }: CoachData) {
   return { habits: habitRows, checkins, challenges: challengeRows };
 }
 
+/** The last two weeks as the plain-text digest the AI coach reads (today still in progress). */
+export function coachDigest(today: string, data: CoachData) {
+  return buildDigest({ kind: 'daily', today, ...toRows(today, data) }).text;
+}
+
 async function writeLocally(kind: CoachKind, today: string, data: CoachData): Promise<CoachResult> {
   if (!data.habits.length) return { ok: true, message: null };
   const digest = buildDigest({ kind, today, ...toRows(today, data) });

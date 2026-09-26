@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { clockOffset } from '@/lib/clock';
-import { insightsFor } from '@/lib/coach-insights';
+import { insightsFor, type Insight } from '@/lib/coach-insights';
 import { iconText } from '@/lib/icons';
 import { checkinXp, habitCountOn } from '@/lib/xp';
 
@@ -82,12 +82,38 @@ function listNames(habits: Habit[]) {
 /** The AI coach's latest daily nudge, delivered as the next morning notification. */
 export type CoachNote = { day: string; title: string; body: string };
 
+/**
+ * The afternoon coach tips: one insight for today (if its time hasn't passed) and one for
+ * tomorrow. Only two days out, because they're about recent days. Prefers the "crushing X, have
+ * you considered Y" pairing and skips advice about habits already done today.
+ */
+export function coachTips(habits: Habit[], challenges: Challenge[], settings: Settings) {
+  const tips: { day: string; insight: Insight }[] = [];
+  if (!settings.coachPushOn || settings.coachOff || !habits.length) return tips;
+  const today = dayKey();
+  const value = (i: Insight) => i.score + (i.kind === 'pair' ? 15 : 0);
+  for (let offset = 0; offset < COACH_DAYS_AHEAD; offset++) {
+    const day = addDays(today, offset);
+    if (offset === 0 && at(day, settings.coachPush) <= new Date()) continue;
+    const open = habits.filter((h) => offset > 0 || !isDone(h, day));
+    const insight = insightsFor(habits, challenges, day, settings.name)
+      // Tonight's final state can't be known ahead, and no two days get the same tip.
+      .filter((i) => i.kind !== 'perfect-close' && !tips.some((t) => t.insight.id === i.id))
+      .filter((i) => !i.about.length || i.about.some((id) => open.some((h) => h.id === id)))
+      .sort((a, b) => value(b) - value(a))[0];
+    if (insight) tips.push({ day, insight });
+  }
+  return tips;
+}
+
 /** Builds the next week of nudges from the user's actual state. */
 export function planReminders(
   habits: Habit[],
   challenges: Challenge[],
   settings: Settings,
-  coach: CoachNote | null = null
+  coach: CoachNote | null = null,
+  /** The phone's AI versions of the coach tips, keyed `day|insightId` (see `coachTips`). */
+  pushText: Record<string, string> = {}
 ) {
   const now = new Date();
   const today = dayKey();
@@ -96,7 +122,7 @@ export function planReminders(
   // The coach's nudge replaces the next upcoming morning message, while it's at most a day old.
   let coachNote = coach && coach.day >= addDays(today, -1) ? coach : null;
 
-  const coachIdsUsed: string[] = [];
+  const tips = coachTips(habits, challenges, settings);
 
   const live = challenges
     .filter((c) => !c.completedAt && !c.dismissed)
@@ -176,28 +202,13 @@ export function planReminders(
     }
 
     // Afternoon: one personal insight from the coach ("I noticed you've been crushing…").
-    if (settings.coachPushOn && !settings.coachOff && offset < COACH_DAYS_AHEAD) {
-      const insight = insightsFor(habits, challenges, day, settings.name)
-        // Can't know tonight's final state, and skip advice about habits already done today.
-        .filter((i) => i.kind !== 'perfect-close' && !coachIdsUsed.includes(i.id))
-        .filter(
-          (i) =>
-            !isToday || !i.about.length || i.about.some((id) => pending.some((h) => h.id === id))
-        )
-        // The "crushing X, have you considered Y" note is the one people asked for.
-        .sort(
-          (a, b) =>
-            b.score + (b.kind === 'pair' ? 15 : 0) - (a.score + (a.kind === 'pair' ? 15 : 0))
-        )[0];
-      if (insight) {
-        coachIdsUsed.push(insight.id);
-        planned.push({
-          date: at(day, settings.coachPush),
-          title: `🧑‍🏫 ${insight.title}`,
-          body: insight.push,
-        });
-      }
-    }
+    const tip = tips.find((t) => t.day === day);
+    if (tip)
+      planned.push({
+        date: at(day, settings.coachPush),
+        title: `🧑‍🏫 ${tip.insight.title}`,
+        body: pushText[`${day}|${tip.insight.id}`] ?? tip.insight.push,
+      });
 
     // Evening: don't let the day close with the loop open.
     const atRisk = pending
@@ -252,11 +263,12 @@ export function syncReminders(
   habits: Habit[],
   challenges: Challenge[],
   settings: Settings,
-  coach: CoachNote | null = null
+  coach: CoachNote | null = null,
+  pushText: Record<string, string> = {}
 ) {
   if (!supported) return Promise.resolve();
   const mine = ++generation;
-  const run = queue.then(() => runSync(mine, habits, challenges, settings, coach));
+  const run = queue.then(() => runSync(mine, habits, challenges, settings, coach, pushText));
   queue = run.catch(() => {});
   return run;
 }
@@ -266,14 +278,15 @@ async function runSync(
   habits: Habit[],
   challenges: Challenge[],
   settings: Settings,
-  coach: CoachNote | null
+  coach: CoachNote | null,
+  pushText: Record<string, string>
 ) {
   if (mine !== generation) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
   // Time travel (developer tools) would schedule on the wrong real dates.
   if (clockOffset() !== 0) return;
   if (!settings.reminders || !(await ensurePermission(false))) return;
-  for (const p of planReminders(habits, challenges, settings, coach)) {
+  for (const p of planReminders(habits, challenges, settings, coach, pushText)) {
     if (mine !== generation) return;
     await Notifications.scheduleNotificationAsync({
       content: { title: p.title, body: p.body, sound: 'default' },

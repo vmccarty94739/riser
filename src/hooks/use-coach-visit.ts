@@ -3,9 +3,11 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 
 import { dayKey, useHabits } from '@/hooks/use-habits';
-import { rewordOnDevice } from '@/lib/coach-device';
+import { coachDigest } from '@/lib/coach';
+import { deviceModelReady, rewordOnDevice, rewordPushOnDevice } from '@/lib/coach-device';
 import { insightsFor, pickInsight, type Insight } from '@/lib/coach-insights';
 import { quoteHabits } from '@/lib/coach-rules';
+import { coachTips } from '@/lib/reminders';
 
 /**
  * Fresh coaching on every visit: each time the user comes back to the app (after at least
@@ -136,7 +138,7 @@ export function useCoachVisits() {
     });
 
     // Not cancelled on re-render: the id check drops it if a newer visit has started.
-    rewordOnDevice(insight, name).then((ai) => {
+    rewordOnDevice(insight, name, coachDigest(today, { habits: hs, challenges: cs })).then((ai) => {
       if (!state.current || state.current.id !== insight.id) return;
       const names = hs.map((h) => h.name);
       publish({
@@ -152,4 +154,52 @@ export function useCoachVisits() {
       });
     });
   }, [active, visit]);
+}
+
+/** AI-written afternoon notifications, by `day|insightId|name` (null = tried, keep the rules text). */
+const pushCache = new Map<string, string | null>();
+
+/**
+ * The phone's AI versions of the upcoming afternoon coach tips (see `coachTips`), keyed
+ * `day|insightId` for `planReminders`. Each tip is written once, in the background; without the
+ * phone's model this stays empty and the rules text is sent.
+ */
+export function useCoachPushText() {
+  const { habits, challenges, settings, loaded } = useHabits();
+  const [texts, setTexts] = useState<Record<string, string>>({});
+  const tips = loaded ? coachTips(habits, challenges, settings) : [];
+  const key = tips.map((t) => `${t.day}|${t.insight.id}|${settings.name}`).join(',');
+  const data = useRef({ tips, habits, challenges, name: settings.name });
+  useEffect(() => {
+    data.current = { tips, habits, challenges, name: settings.name };
+  });
+
+  useEffect(() => {
+    if (!key || !deviceModelReady()) return;
+    let live = true;
+    (async () => {
+      const { tips: todo, habits: hs, challenges: cs, name } = data.current;
+      const next: Record<string, string> = {};
+      for (const t of todo) {
+        const id = `${t.day}|${t.insight.id}|${name}`;
+        if (!pushCache.has(id)) {
+          const digest = coachDigest(t.day, { habits: hs, challenges: cs });
+          pushCache.set(id, await rewordPushOnDevice(t.insight, name, digest));
+        }
+        const text = pushCache.get(id);
+        if (text) {
+          next[`${t.day}|${t.insight.id}`] = quoteHabits(
+            { title: text, body: '', tip: null, highlights: [] },
+            hs.map((h) => h.name)
+          ).title;
+        }
+      }
+      if (live) setTexts(next);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [key]);
+
+  return texts;
 }

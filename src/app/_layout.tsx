@@ -8,7 +8,7 @@ import { Appearance, AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useCoach } from '@/hooks/use-coach';
-import { useCoachVisits } from '@/hooks/use-coach-visit';
+import { useCoachPushText, useCoachVisits } from '@/hooks/use-coach-visit';
 import { dayKey, HabitsProvider, useHabits } from '@/hooks/use-habits';
 import { CloudProvider, useCloud } from '@/hooks/use-cloud';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -121,6 +121,9 @@ function ReminderSync() {
   useCoach('daily', dayKey());
   // Fresh coaching each time the app is opened (Dashboard card, Coach's Report "Today").
   useCoachVisits();
+  // The phone's AI versions of the afternoon coach notifications (empty without the model).
+  const pushText = useCoachPushText();
+  const pushKey = Object.entries(pushText).join(',');
   const daily = useSyncExternalStore(subscribeCoach, () => coachMessage('daily', cloud.user?.id));
   const coachOn = COACH_ENGINE === 'device' ? !settings.coachOff : settings.coach;
   const coach =
@@ -139,12 +142,12 @@ function ReminderSync() {
   useEffect(() => {
     if (!loaded) return;
     const timer = setTimeout(() => {
-      syncReminders(habits, challenges, settings, coach).catch(() => {});
+      syncReminders(habits, challenges, settings, coach, pushText).catch(() => {});
     }, 800);
     return () => clearTimeout(timer);
-    // `coach` is rebuilt every render; `coachKey` tracks its content.
+    // `coach` and `pushText` are rebuilt every render; their keys track the content.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, habits, challenges, settings, foregrounds, coachKey]);
+  }, [loaded, habits, challenges, settings, foregrounds, coachKey, pushKey]);
 
   return null;
 }

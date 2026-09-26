@@ -158,6 +158,49 @@ const namedAsGoal = (s: Stats) =>
 const winning = (s: Stats) =>
   namedAsGoal(s) ? `crushing ${s.name}` : `staying clean from ${s.name}`;
 
+/** Weekdays this habit usually slips on (missed on most of the last four of them). */
+const slipDays = (s: Stats) =>
+  [0, 1, 2, 3, 4, 5, 6].filter(
+    (w) => s.seen[w] >= 3 && s.missed[w] >= 2 && s.missed[w] / s.seen[w] >= 0.6
+  );
+
+const listDays = (days: number[]) =>
+  days.length === 1
+    ? LONG_DAY[days[0]]
+    : `${days
+        .slice(0, -1)
+        .map((d) => LONG_DAY[d])
+        .join(', ')} and ${LONG_DAY[days[days.length - 1]]}`;
+
+/** Why a habit is slipping, from its own data: which weekdays, and how long since the last one. */
+function slipContext(s: Stats, today: string) {
+  // Weekdays only mean something when the habit is mostly on track; the worst ones first.
+  const days =
+    ratio(s.recent) >= 0.4
+      ? slipDays(s)
+          .sort((a, b) => s.missed[b] / s.seen[b] - s.missed[a] / s.seen[a])
+          .slice(0, 2)
+      : [];
+  let since = 0;
+  for (let i = 1; i <= 14; i++) {
+    const day = addDays(today, -i);
+    if (!s.tracked(day)) break;
+    if (s.done(day)) break;
+    since = i;
+  }
+  const parts: string[] = [];
+  if (days.length) parts.push(`it mostly slips on ${listDays(days)}`);
+  else if (ratio(s.recent) < 0.4) parts.push('it’s been missed on most days, not just a bad one');
+  if (since >= 3) parts.push(`the last ${s.quit ? 'clean day' : 'one'} was ${since} days ago`);
+  return parts.length ? `, and ${parts.join(', and ')}` : '';
+}
+
+/** A smaller version for a hard day, so the plan never becomes all-or-nothing. */
+const smallVersion = (s: Stats) =>
+  s.quit
+    ? 'If a craving hits anyway, wait 10 minutes before deciding anything. Most pass on their own.'
+    : `On a hard day, do the 2-minute version of ${s.name}. Showing up is what keeps a habit alive.`;
+
 const established = (s: Stats) => s.recent.of >= 5;
 const strong = (s: Stats) => established(s) && (ratio(s.recent) >= 0.8 || s.streak >= 5);
 const weak = (s: Stats) => s.recent.of >= 4 && ratio(s.recent) <= 0.6;
@@ -198,7 +241,7 @@ export function insightsFor(
     const stack = !s.quit && !w.quit;
     const own = specificTip(w.habit);
     const cue = `Do ${w.name} right after ${s.name}, so the habit you never miss becomes its cue.`;
-    const tip = stack ? (own ? `${cue} ${own}` : cue) : tipFor(w.habit);
+    const tip = `${stack ? (own ? `${cue} ${own}` : cue) : tipFor(w.habit)} ${smallVersion(w)}`;
     const quick = stack ? cue : tipFor(w.habit);
     const run = s.streak >= 3 ? `, including a ${s.streak}-day streak` : '';
     add({
@@ -212,7 +255,7 @@ export function insightsFor(
             s.habit.id + w.habit.id
           )
         : `You’re staying clean from ${s.name}`,
-      body: `${s.name} is at ${s.recent.done} of the last ${s.recent.of} ${s.unit}${run}. ${w.name} is at ${w.recent.done} of ${w.recent.of}. You clearly know how to stick with something, so let’s give ${w.name} the same energy.`,
+      body: `${s.name} is at ${s.recent.done} of the last ${s.recent.of} ${s.unit}${run}, so the discipline is clearly there. ${w.name} is at ${w.recent.done} of ${w.recent.of}${slipContext(w, today)}. That gap is the opportunity: you’ve already proven you can hold a routine, and ${w.name} just needs the same structure.`,
       tip,
       push: `${name ? `Hey ${name}, ` : ''}I noticed you’ve been ${winning(s)} lately (${s.recent.done} of ${s.recent.of} ${s.unit}), but have you considered giving ${w.name} the same energy? Here’s a quick and easy way: ${lowerFirst(quick)}`,
       facts: [
@@ -235,8 +278,12 @@ export function insightsFor(
         about: [s.habit.id],
         score: 76,
         title: `${LONG_DAY[weekday]} are tricky for ${s.name}`,
-        body: `You’ve missed ${s.name} on ${m} of the last ${n} ${LONG_DAY[weekday]}, and today is one of them. Knowing that is half the battle: decide now when you’ll do it.`,
-        tip,
+        body: `You’ve missed ${s.name} on ${m} of the last ${n} ${LONG_DAY[weekday]}, and today is one of them.${
+          pct(s.recent) >= 60
+            ? ` Across the last ${s.recent.of} days it’s at ${s.recent.done}, so this isn’t a motivation problem, it’s a ${LONG_DAY[weekday].slice(0, -1)} problem: something about this day’s schedule keeps crowding it out.`
+            : ' Knowing the pattern is half the battle.'
+        } Decide right now exactly when it happens today.`,
+        tip: `${tip} ${smallVersion(s)}`,
         push: `${name ? `Heads up ${name}: ` : 'Heads up: '}${LONG_DAY[weekday]} are when ${s.name} usually slips (missed ${m} of the last ${n}). Quick fix: ${lowerFirst(tip)}`,
         facts: [`${s.name}: missed ${m} of the last ${n} ${LONG_DAY[weekday]}`],
       });
@@ -349,8 +396,8 @@ export function insightsFor(
           about: [s.habit.id],
           score: 69,
           title: `${s.name} has dipped this week`,
-          body: `${s.week.done} of ${s.week.of} ${s.unit} this past week, down from ${s.prevWeek.done} of ${s.prevWeek.of}. A dip is normal. Catching it early is what keeps it from sticking.`,
-          tip,
+          body: `${s.week.done} of ${s.week.of} ${s.unit} this past week, down from ${s.prevWeek.done} of ${s.prevWeek.of}${slipContext(s, today)}. A dip after a good week is normal, and catching it now, before it becomes the new normal, is what matters.`,
+          tip: `${tip} ${smallVersion(s)}`,
           push: `${name ? `Hey ${name}, ` : ''}${s.name} slipped to ${s.week.done} of ${s.week.of} this week (from ${s.prevWeek.done}). One small win today turns it around: ${lowerFirst(tip)}`,
           facts: [
             `${s.name}: ${s.week.done} of ${s.week.of} this week, ${s.prevWeek.done} of ${s.prevWeek.of} the week before`,
@@ -366,8 +413,8 @@ export function insightsFor(
         about: [s.habit.id],
         score: 67,
         title: `Back on track with ${s.name}`,
-        body: `You’ve had a ${s.best}-day clean run before, and you’re at ${s.recent.done} of ${s.recent.of} clean days lately. One slip doesn’t erase that. Today is a clean slate.`,
-        tip,
+        body: `You’ve had a ${s.best}-day clean run before, and you’re at ${s.recent.done} of ${s.recent.of} clean days lately${slipContext(s, today)}. One slip doesn’t erase that run; the real risk is letting one slip turn into a pattern. Today is a clean slate.`,
+        tip: `${tip} ${smallVersion(s)}`,
         push: address(
           `one slip doesn’t undo your ${s.best}-day clean run on ${s.name}. Today’s a fresh start: ${lowerFirst(tip)}`
         ),
