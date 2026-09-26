@@ -1,4 +1,4 @@
-// Renders Riser's brand artwork: a sunrise with a check mark that becomes an upward arrow.
+// Renders Timber's brand artwork: a sunrise with a check mark that becomes an upward arrow.
 const fs = require('fs');
 const path = require('path');
 const { Resvg } = require('@resvg/resvg-js');
@@ -54,6 +54,6 @@ render('favicon.png', svg(1024, 1024, `<rect width="1024" height="1024" rx="224"
 render('feature-graphic.png', svg(1024, 500, `
   <rect width="1024" height="500" fill="url(#bg)"/>
   <g transform="translate(40,20) scale(0.45)">${glyph()}</g>
-  <text x="520" y="230" font-family="SF Pro Display, Helvetica Neue, Helvetica, Arial" font-weight="800" font-size="120" fill="#FFFFFF">Riser</text>
+  <text x="520" y="230" font-family="SF Pro Display, Helvetica Neue, Helvetica, Arial" font-weight="800" font-size="120" fill="#FFFFFF">Timber</text>
   <text x="524" y="300" font-family="SF Pro Text, Helvetica Neue, Helvetica, Arial" font-weight="600" font-size="40" fill="#FFFFFF" opacity="0.92">Small wins. Every day.</text>
   <text x="524" y="352" font-family="SF Pro Text, Helvetica Neue, Helvetica, Arial" font-weight="500" font-size="28" fill="#FFFFFF" opacity="0.8">Build good habits · Break bad ones</text>`, BG + SUN), 1024);

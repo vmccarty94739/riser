@@ -220,7 +220,7 @@ export default function SettingsScreen() {
     updateSettings({ reminders: on });
   };
 
-  // Reminders can be on in Riser but blocked in the phone's settings; say so instead of failing silently.
+  // Reminders can be on in Timber but blocked in the phone's settings; say so instead of failing silently.
   const [blocked, setBlocked] = useState(false);
   useEffect(() => {
     if (!native || !settings.reminders) return;
@@ -299,7 +299,7 @@ export default function SettingsScreen() {
             onPress={() => Linking.openSettings()}
             style={[styles.warning, { backgroundColor: theme.dangerSoft }]}>
             <ThemedText type="smallBold" style={{ color: theme.danger }}>
-              Notifications are blocked for Riser
+              Notifications are blocked for Timber
             </ThemedText>
             <ThemedText type="small" style={{ color: theme.danger }}>
               Your reminders can’t arrive. Tap to open your phone’s settings and allow
@@ -477,7 +477,7 @@ export default function SettingsScreen() {
           accessibilityRole="button"
           accessibilityHint={SUPPORT_EMAIL}
           onPress={() =>
-            open(`mailto:${SUPPORT_EMAIL}?subject=Riser%20support`, `Email us at ${SUPPORT_EMAIL}`)
+            open(`mailto:${SUPPORT_EMAIL}?subject=Timber%20support`, `Email us at ${SUPPORT_EMAIL}`)
           }
           style={styles.linkRow}>
           <ThemedText>Contact support</ThemedText>
@@ -516,7 +516,7 @@ export default function SettingsScreen() {
       </Section>
 
       <ThemedText type="small" themeColor="textSecondary" style={styles.version}>
-        Riser {Constants.expoConfig?.version ?? ''}
+        Timber {Constants.expoConfig?.version ?? ''}
       </ThemedText>
     </SheetScreen>
   );

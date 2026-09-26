@@ -1,4 +1,4 @@
-// Synthesizes Riser's reward sounds as 16-bit mono WAVs.
+// Synthesizes Timber's reward sounds as 16-bit mono WAVs.
 const fs = require('fs');
 const path = require('path');
 const SR = 44100;

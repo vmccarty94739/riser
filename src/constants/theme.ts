@@ -50,7 +50,7 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
-/** Riser's brand blue: app icon, splash screen and launch overlay. */
+/** Timber's brand blue: app icon, splash screen and launch overlay. */
 export const BrandColor = '#1A78E6';
 
 /**

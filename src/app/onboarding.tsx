@@ -369,7 +369,7 @@ export default function OnboardingScreen() {
     ),
     how: (
       <View key="how" style={styles.step}>
-        <ThemedText type="subtitle">How Riser works</ThemedText>
+        <ThemedText type="subtitle">How Timber works</ThemedText>
         <ThemedText themeColor="textSecondary">
           Three tabs at the bottom. Here’s the whole app in 30 seconds.
         </ThemedText>

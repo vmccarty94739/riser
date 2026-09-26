@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "Riser",
-    "slug": "riser-app",
+    "name": "Timber",
+    "slug": "timber",
     "version": "1.0.0",
     "description": "Build good habits, break bad ones, and earn trophies for showing up every day.",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "riserapp",
+    "scheme": "timberapp",
     "userInterfaceStyle": "automatic",
     "primaryColor": "#1A78E6",
     "backgroundColor": "#FFFFFF",
     "ios": {
-      "bundleIdentifier": "com.vadenmccarty.riser",
+      "bundleIdentifier": "com.vadenmccarty.timber",
       "supportsTablet": false,
       "icon": "./assets/images/icon.png",
       "config": {
@@ -78,7 +78,7 @@
       }
     },
     "android": {
-      "package": "com.vadenmccarty.riser",
+      "package": "com.vadenmccarty.timber",
       "adaptiveIcon": {
         "backgroundColor": "#1A78E6",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -110,7 +110,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Riser doesn't record audio. The audio library that plays Riser's check-in sounds includes recording features, so iOS requires this description.",
+          "microphonePermission": "Timber doesn't record audio. The audio library that plays Timber's check-in sounds includes recording features, so iOS requires this description.",
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false
         }
@@ -118,8 +118,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Riser lets you attach a photo from your library as proof that you completed a habit.",
-          "cameraPermission": "Riser uses the camera so you can snap a proof photo when you complete a habit.",
+          "photosPermission": "Timber lets you attach a photo from your library as proof that you completed a habit.",
+          "cameraPermission": "Timber uses the camera so you can snap a proof photo when you complete a habit.",
           "microphonePermission": false
         }
       ],
@@ -134,7 +134,7 @@
       [
         "expo-secure-store",
         {
-          "faceIDPermission": "Riser doesn't use Face ID. The secure storage that keeps you signed in supports it, so iOS requires this description."
+          "faceIDPermission": "Timber doesn't use Face ID. The secure storage that keeps you signed in supports it, so iOS requires this description."
         }
       ]
     ],
@@ -145,7 +145,7 @@
     "owner": "vmccarty",
     "extra": {
       "eas": {
-        "projectId": "f4656da0-11e6-4012-a29f-36e8102c2db8"
+        "projectId": "0d118bdc-784b-4838-947c-ded3f09fc9ef"
       }
     }
   }

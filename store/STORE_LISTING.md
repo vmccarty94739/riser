@@ -1,4 +1,4 @@
-# Riser: store listing & submission guide
+# Timber: store listing & submission guide
 
 Everything the App Store and Google Play ask for, ready to paste, plus the steps only you can do.
 
@@ -6,8 +6,8 @@ Everything the App Store and Google Play ask for, ready to paste, plus the steps
 
 ## 1. Listing copy
 
-**App name** (30 max): `Riser: Habit Tracker`
-_"Riser" alone may already be taken on either store; the suffix also helps search._
+**App name** (30 max): `Timber: Habit Tracker`
+_"Timber" alone may already be taken on either store; the suffix also helps search._
 
 **iOS subtitle** (30 max): `Build habits. Break bad ones.`
 
@@ -20,7 +20,7 @@ _"Riser" alone may already be taken on either store; the suffix also helps searc
 **Description** (both stores):
 
 ```
-Riser turns habits into wins you can feel.
+Timber turns habits into wins you can feel.
 
 CHECK IN WITH ONE TAP
 Tap the ring when you do a habit. Every check-in gets a satisfying chime, a burst of confetti and a little haptic kick. Habits you do several times a day fill up one tap at a time.
@@ -79,17 +79,17 @@ No analytics, no ads, no third-party tracking. Proof photos stay on the phone an
 - Is data encrypted in transit? **Yes**. Can users request deletion? **Yes** (Settings → Account → Delete account, or email).
 - Supabase processes the data on your behalf, which counts as a service provider, not "sharing".
 
-**Privacy policy URL** (required by both): https://vmccarty94739.github.io/riser/privacy/ (GitHub Pages, built from `docs/privacy.md`; edit that file to change it). Settings → Help & privacy links to it in the app.
+**Privacy policy URL** (required by both): https://vmccarty94739.github.io/timber/privacy/ (GitHub Pages, built from `docs/privacy.md`; edit that file to change it). Settings → Help & privacy links to it in the app.
 
-**Support URL** (Apple requires one): https://vmccarty94739.github.io/riser/ (built from `docs/index.md`).
+**Support URL** (Apple requires one): https://vmccarty94739.github.io/timber/ (built from `docs/index.md`).
 
-**Support / contact email**: `riserapp.support@gmail.com`. It's also the sender of Riser's account emails: Gmail SMTP in Supabase, limited to 500 a day. Move to a domain with a service like Resend if the app outgrows that.
+**Support / contact email**: `riserapp.support@gmail.com`. It's also the sender of Timber's account emails: Gmail SMTP in Supabase, limited to 500 a day. Move to a domain with a service like Resend if the app outgrows that.
 
 ---
 
 ## 3. Age rating questionnaires
 
-Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and adult content. It shows only short labels and icons for these — no depictions, no content.
+Timber lets people track quitting alcohol, tobacco/vaping, drugs, gambling and adult content. It shows only short labels and icons for these — no depictions, no content.
 
 - **Apple**: answer the questionnaire honestly; the rating follows from the answers.
   - "Alcohol, Tobacco, or Drug Use or References" → **Infrequent/Mild** (quit-habit labels such as Alcohol, Weed, Drugs, Vaping).
@@ -107,7 +107,7 @@ Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and ad
 Paste into App Store Connect → App Review Information → Notes:
 
 ```
-Riser is a habit tracker. It works offline and needs no sign-in: after onboarding, data is backed up
+Timber is a habit tracker. It works offline and needs no sign-in: after onboarding, data is backed up
 automatically to an anonymous guest account.
 
 ACCOUNTS

@@ -1,8 +1,8 @@
-# Riser
+# Timber
 
 Build good habits, break bad ones, and earn trophies for showing up every day.
 
-Riser is a habit tracker for iOS and Android, built with Expo (React Native) and Supabase. It is offline-first: every screen reads from a local copy on the phone, so taps are instant. Changes sync to Supabase in the background.
+Timber is a habit tracker for iOS and Android, built with Expo (React Native) and Supabase. It is offline-first: every screen reads from a local copy on the phone, so taps are instant. Changes sync to Supabase in the background.
 
 ## Features
 
@@ -14,7 +14,7 @@ Riser is a habit tracker for iOS and Android, built with Expo (React Native) and
 - **Camera Roll.** Holds the proof photos attached to completed habits, sorted by date.
 - **Coach.** A daily nudge plus weekly and monthly reports built from your real streaks. They're written on the phone by its built-in AI (Apple Intelligence or Gemini Nano) where available, or by the app's rule-based coach otherwise. Nothing leaves the device. A Claude-powered version is built and deployed but switched off (`COACH_ENGINE` in `src/lib/coach.ts`).
 - **Reminders.** A morning intention, reminders at times you choose, and an evening nudge only when something is still open. All are local notifications.
-- **Cloud backup and accounts.** Riser backs up to a guest account from the first day, with no sign-up. Add an email and password to sign in on another phone. Includes password reset and in-app account deletion.
+- **Cloud backup and accounts.** Timber backs up to a guest account from the first day, with no sign-up. Add an email and password to sign in on another phone. Includes password reset and in-app account deletion.
 - **Light and dark mode**, with text that stays readable on every unlockable color.
 
 ## Tech stack
@@ -102,7 +102,7 @@ Store copy, privacy answers and the pre-submission checklist are in [`store/`](s
 
 ## Privacy
 
-Habits, check-ins, challenges and settings are backed up to the user's own account in Supabase (a guest account until they add an email), protected by Row Level Security. Proof photos, the coach and its name for you stay on the phone. There are no analytics, ads or tracking. See the [privacy policy](docs/privacy.md), published at https://vmccarty94739.github.io/riser/privacy/.
+Habits, check-ins, challenges and settings are backed up to the user's own account in Supabase (a guest account until they add an email), protected by Row Level Security. Proof photos, the coach and its name for you stay on the phone. There are no analytics, ads or tracking. See the [privacy policy](docs/privacy.md), published at https://vmccarty94739.github.io/timber/privacy/.
 
 ## License
 

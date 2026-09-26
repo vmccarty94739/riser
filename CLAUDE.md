@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Riser is a habit tracker headed for the App Store and Google Play (Expo SDK 57, React Native 0.86, Expo Router, TypeScript strict, React Compiler on). Day-to-day development runs in **Expo Go**, so only modules bundled in Expo Go may be added. Store binaries are built in the cloud with EAS. The backend is **Supabase** (Postgres + Auth). The app is offline-first: the local store is always the UI's source of truth, and Supabase is synced in the background.
+Timber is a habit tracker headed for the App Store and Google Play (Expo SDK 57, React Native 0.86, Expo Router, TypeScript strict, React Compiler on). Day-to-day development runs in **Expo Go**, so only modules bundled in Expo Go may be added. Store binaries are built in the cloud with EAS. The backend is **Supabase** (Postgres + Auth). The app is offline-first: the local store is always the UI's source of truth, and Supabase is synced in the background.
 
 ## Commands
 
@@ -28,7 +28,11 @@ npx expo config --type introspect        # resolved native config (permissions, 
 node scripts/synth-sounds.js assets/sounds   # regenerate all reward/chime WAVs
 ```
 
-Release builds (`eas init/build/submit`) are listed in `README.md`. The store copy, privacy answers and release checklist are in `store/`. The privacy policy and support page are `docs/privacy.md` and `docs/index.md`, published by GitHub Pages (main branch, `/docs`) at https://vmccarty94739.github.io/riser/; the app links to them from `src/lib/links.ts`.
+Release builds (`eas init/build/submit`) are listed in `README.md`. The store copy, privacy answers and release checklist are in `store/`. The privacy policy and support page are `docs/privacy.md` and `docs/index.md`, published by GitHub Pages (main branch, `/docs`) at https://vmccarty94739.github.io/timber/; the app links to them from `src/lib/links.ts`.
+
+## Name
+
+- **Renamed from Riser to Timber** (App Store name `Timber: Habit Tracker`, bundle/package `com.vadenmccarty.timber`, scheme `timberapp`, EAS `@vmccarty/timber`, repo and Pages at `vmccarty94739/timber`). Internal identifiers deliberately still say `riser` so existing installs keep their data and sessions: AsyncStorage keys (`riser.store.v3`, `riser.sync.v1`, `riser.coach.*`), the SecureStore marker, `riser-test-` notification ids and `globalThis.__riserClockOffset`. Users never see them; don't rename them without a migration. Applied migrations also keep their old comments (never edit an applied migration). The support/SMTP Gmail is still `riserapp.support@gmail.com` until a Timber address replaces it in `src/lib/links.ts`, `docs/`, the store listing and Supabase SMTP settings.
 
 ## Environment gotchas
 

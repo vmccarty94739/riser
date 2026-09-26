@@ -34,7 +34,7 @@ const supported = Platform.OS !== 'web';
 
 if (supported) {
   Notifications.setNotificationHandler({
-    // Show reminders even while Riser is open: a reminder the user set must always be seen.
+    // Show reminders even while Timber is open: a reminder the user set must always be seen.
     handleNotification: async () => ({
       shouldPlaySound: true,
       shouldSetBadge: false,
@@ -346,7 +346,7 @@ export async function sendTestReminder(
   await Notifications.scheduleNotificationAsync({
     identifier: `${TEST_PREFIX}${Date.now()}`,
     content: {
-      title: sample?.title ?? 'Riser 🌱',
+      title: sample?.title ?? 'Timber 🌱',
       body: sample?.body ?? 'This is how your daily check-ins will look.',
       sound: 'default',
       data: { test: true },

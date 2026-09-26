@@ -1,5 +1,5 @@
 /**
- * Riser AI coach (Supabase Edge Function).
+ * Timber AI coach (Supabase Edge Function).
  *
  * POST { kind: 'daily' | 'weekly' | 'monthly', today: 'YYYY-MM-DD' } with the user's session
  * token (an email account; guests get 403). Reads that user's habits, check-ins and challenges (through RLS, as the user), turns them
