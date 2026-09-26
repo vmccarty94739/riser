@@ -130,7 +130,13 @@
           "color": "#1A78E6"
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

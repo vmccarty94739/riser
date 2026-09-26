@@ -30,8 +30,12 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (cloud builds get the public Supabase values from eas.json)
+.env
 .env*.local
+
+# Supabase CLI state
+supabase/.temp/
 
 # typescript
 *.tsbuildinfo

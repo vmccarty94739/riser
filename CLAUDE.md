@@ -16,6 +16,7 @@ Node comes from nvm, so in non-interactive shells run `export NVM_DIR="$HOME/.nv
 npx expo start --tunnel                  # dev server (the user's phone can't reach the Mac over LAN)
 npm test                                 # all unit tests (jest-expo)
 npm run test:e2e                         # live sync test: two simulated phones vs the real Supabase project
+npm run test:security                    # live server limits: size caps + password rule, as a throwaway guest
 npx jest src/lib/__tests__/xp.test.ts    # one test file
 npx jest -t "fair regardless"            # tests whose name matches
 npm run typecheck                        # tsc --noEmit
@@ -31,7 +32,7 @@ Release builds (`eas init/build/submit`) are listed in `README.md`. The store co
 
 ## Environment gotchas
 
-- Supabase config comes from `.env` (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` = the publishable key; see `.env.example`). Without it, `cloudConfigured` is false and the app runs local-only with account UI hidden, which is also how the tests run. The schema lives in `supabase/migrations/`. There is no Supabase CLI link, so migrations are applied by pasting them into the dashboard SQL Editor. When the schema changes, add a new migration file; never edit an applied one.
+- Supabase config comes from `.env` locally (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY` = the publishable key; see `.env.example`). `.env` is gitignored, so EAS never uploads it: cloud builds get the same two public values from the `base` profile's `env` in `eas.json` (every build profile extends it). Change both places together. Without them, `cloudConfigured` is false and the app runs local-only with account UI hidden, which is also how the tests run. The schema lives in `supabase/migrations/`. There is no Supabase CLI link, so migrations are applied by pasting them into the dashboard SQL Editor. When the schema changes, add a new migration file; never edit an applied one.
 - Typed routes (`.expo/types`) regenerate only when the dev server starts. After adding or renaming a route, `tsc` reports stale `href` errors until `npx expo start` has run once.
 - Tunnel mode needs global `@expo/ngrok`, and the Expo CLI must be logged in as the same account signed into Expo Go.
 - Tests live in `src/lib/__tests__/` and import their globals from `@jest/globals`, because the Expo tsconfig doesn't expose jest globals. `helpers.ts` freezes "today" at `2026-09-24` with fake timers. AsyncStorage and `.css` are mapped to mocks in the `jest` block of `package.json`.
@@ -90,7 +91,7 @@ The user designs by five layers; check new work against them: **core function** 
 - **Tables:**
   - `profiles` holds `seen_level` and the `settings` jsonb. `habits`, `checkins` (one row per habit per day; a count of 0 means un-checked) and `challenges` are keyed by `(user_id, id)` and keep the app's own string ids.
   - RLS limits every row to `auth.uid()`. The server sets `updated_at` with a trigger.
-  - Deleting a habit or challenge removes its row; a habit's check-ins go with it by cascade. First, a tombstone `(kind, record_id)` is written to `deletions`, which pulls read so other devices drop the record. Saving a record again clears its tombstone. Migrations run in order: `…_init.sql`, `…_hard_deletes.sql`, `…_lock_down_helpers.sql`, then `…_coach_messages.sql`. The remaining Supabase advisor warnings are intentional: `delete_account` callable by signed-in users, and anonymous sign-ins. Leaked-password protection needs the Pro plan.
+  - Deleting a habit or challenge removes its row; a habit's check-ins go with it by cascade. First, a tombstone `(kind, record_id)` is written to `deletions`, which pulls read so other devices drop the record. Saving a record again clears its tombstone. Migrations run in order: `…_init.sql`, `…_hard_deletes.sql`, `…_lock_down_helpers.sql`, `…_coach_messages.sql`, then `…_size_limits.sql` (length caps on every free-form column, well above the app's own form limits, because anyone can mint a guest and call the API directly). The server also enforces the password rule (8+ characters, letters and digits) that `validatePassword` shows. The remaining Supabase advisor warnings are intentional: `delete_account` callable by signed-in users, and anonymous sign-ins. Leaked-password protection needs the Pro plan.
   - `delete_account()` (security definer) deletes the auth user, and the foreign keys cascade to every row.
   - Proof photos and `bonusXp` never sync. `onboarded` doesn't sync either: signing in sets it from whether the account has data.
 - **`src/lib/sync.ts`** is pure and unit-tested. A `Snapshot` records what the cloud holds per record.
@@ -101,6 +102,7 @@ The user designs by five layers; check new work against them: **core function** 
 - **`src/lib/cloud.ts`** does the network side:
   - `push`: habits before check-ins because of the foreign key; chunked upserts; tombstone then delete.
   - `pull`: paged rows since a cursor from every table including `deletions`, ordered by each table's real key, re-reading 60s before the cursor. `profiles` has no `id` column; ordering by one broke every download once.
+- **Session storage:** the Supabase session lives in the iOS Keychain / Android Keystore through `src/lib/session-storage.ts` (expo-secure-store, chunked because values are capped near 2 KB). The first read moves a session saved by an older version out of AsyncStorage, and a per-key marker in AsyncStorage drops Keychain leftovers after a reinstall. Web uses AsyncStorage. The `expo-secure-store` plugin sets `faceIDPermission: false`.
 - **`src/hooks/use-cloud.tsx`** (`CloudProvider`, `useCloud()`):
   - It owns the session, silent anonymous sign-in once onboarding is done, and sync triggers: pull + push on session start, on foreground and every 60s while open; push 1.5s after local edits; and backoff retries while offline. Failures set `status` to `offline`/`error`, with `syncError` and `syncNow()` for the UI.
   - If an email account's session is lost, `meta.email` stops the silent guest sign-in, so the data isn't copied to a new guest. `signedOutEmail` prompts a sign-in, and signing back in to the same account merges instead of replacing.
@@ -122,7 +124,9 @@ The user designs by five layers; check new work against them: **core function** 
   - Flow: `useCoach` → `requestCoach` → `supabase.functions.invoke('coach')` → `supabase/functions/coach/index.ts` (Deno), which reads the user's data through RLS, asks Claude (`generate.ts` setups: daily `claude-haiku-4-5` without thinking, reflections `claude-sonnet-5` at effort medium), and stores the result in `coach_messages`, once per user, kind and period.
   - It needs the `ANTHROPIC_API_KEY` Supabase secret, and the user's opt-in (`settings.coach`, with `coachAsked` for the one-time offer) per App Store guideline 5.1.2(i).
   - Before switching: run `eval.ts` to choose the cheapest passing daily setup, and restore the Anthropic paragraphs in `store/PRIVACY_POLICY.md`/`STORE_LISTING.md` (see git history).
+  - Guest (anonymous) users get 403 `account_required`, which the app treats as `off`: guests are free to create, so otherwise a script could spend Claude calls and exhaust the global cap. Decide the guest experience (e.g. prompt to create an account) before switching engines.
   - The global cap is 3,000 messages/24h, and dates more than ±2 days from the server's are rejected.
+  - Keep the `ANTHROPIC_API_KEY` secret unset while the engine is `'device'`; without it the function answers 503 and can cost nothing.
 - **Periods:** `daily` covers the last 14 days incl. today (today counts as "not yet", never a miss) and is written once per day. `weekly` covers the last 7 full days, once per Monday-week. `monthly` covers the last 30 full days, once per month. Messages are cached on the phone (`riser.coach.v2`), and `useCoach` waits for that cache before writing so launches don't rewrite them.
 - **Quality bar:** `SYSTEM` in `prompt-text.ts` ends with THE STANDARD, the note every AI coach reads (phone model now, Claude later): connect at least two facts, say why it matters today, give a specific plan with a fallback, sound like someone who studied this person's data. Keep new prompts pointing at it. The phone model gets the full daily digest (`coachDigest`) alongside each insight, and its answers are validated (numbers must come from the insight or digest; the same habits must be named).
 - **Insights (per visit + afternoon push):** `src/lib/coach-insights.ts` (pure, tested) finds patterns in the local data: `pair` (crushing X while Y slips, with habit stacking), `weekday`, `keystone` (A lifts B), `trophy`, `record`, `goal`/`stretch`, `trend-up/down`, `comeback`, `milestone`, `perfect-close`, `best-day`, each scored and written with real numbers plus `tipFor`/`specificTip` advice, and a `push` line in the "Hey {name}, I noticed…" voice. `pickInsight` rotates through them (skips the last 8 shown, avoids the same habit twice in a row).
@@ -148,7 +152,7 @@ The user designs by five layers; check new work against them: **core function** 
 ## Store release
 
 - The app ID `com.vadenmccarty.riser` serves as both the iOS bundle id and the Android package. It becomes permanent after the first upload.
-- `eas.json` has two profiles: `preview` (internal APK) and `production` (versions auto-incremented remotely).
+- `eas.json` has a `base` profile (the public Supabase env) extended by `preview` (internal APK) and `production` (versions auto-incremented remotely).
 - **Native config lives only in `app.json`** (`ios/` and `android/` are generated and gitignored). Plugin options are deliberate:
   - No microphone, background audio, Face ID or media-playback foreground service. `android.blockedPermissions` backs this up.
   - Camera and photo-library permissions carry explanation text.

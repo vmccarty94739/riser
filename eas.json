@@ -4,7 +4,14 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://xledzwoyhhhppcndaoch.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_KEY": "sb_publishable_-MRiEi2BJfJq9r14BaCiGg_G1e_5_Qw"
+      }
+    },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -17,6 +24,7 @@
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"

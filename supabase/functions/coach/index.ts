@@ -2,7 +2,7 @@
  * Riser AI coach (Supabase Edge Function).
  *
  * POST { kind: 'daily' | 'weekly' | 'monthly', today: 'YYYY-MM-DD' } with the user's session
- * token. Reads that user's habits, check-ins and challenges (through RLS, as the user), turns them
+ * token (an email account; guests get 403). Reads that user's habits, check-ins and challenges (through RLS, as the user), turns them
  * into a digest, asks Claude for a nudge or reflection, stores it in `coach_messages` and returns
  * it. A message is generated once per user, kind and period; later calls return the stored one.
  *
@@ -92,6 +92,10 @@ Deno.serve(async (req) => {
     data: { user },
   } = await asUser.auth.getUser(authHeader.replace(/^Bearer\s+/i, ''));
   if (!user) return json(401, { error: 'not_signed_in' });
+  // Guest accounts are free and unlimited, so a script could mint thousands of them to spend
+  // Claude calls and use up the global cap. The paid coach needs an email account; guests keep
+  // the on-device coach.
+  if (user.is_anonymous) return json(403, { error: 'account_required' });
   if (!Deno.env.get('ANTHROPIC_API_KEY')) return json(503, { error: 'coach_not_configured' });
 
   let input: { kind?: unknown; today?: unknown };

@@ -201,7 +201,10 @@ async function askClaude(
   });
   if (error) {
     const status = error instanceof FunctionsHttpError ? error.context.status : 0;
-    return { ok: false, reason: status === 503 ? 'off' : status === 429 ? 'busy' : 'failed' };
+    return {
+      ok: false,
+      reason: status === 503 || status === 403 ? 'off' : status === 429 ? 'busy' : 'failed',
+    };
   }
   const message = data?.message
     ? quoteHabits(

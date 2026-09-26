@@ -50,14 +50,16 @@ Without a `.env`, the app runs local-only, with account features hidden.
 ## Backend (Supabase)
 
 1. Create a Supabase project. Put its URL and **publishable** key in `.env`. Never use the secret key in the app.
-2. Run `supabase/migrations/20260925000000_init.sql` in the dashboard's **SQL Editor**. It creates the tables, Row Level Security policies, `updated_at` triggers and the `delete_account()` function.
+   Cloud builds don't see `.env` (it's gitignored); put the same two values in the `base` profile's `env` in `eas.json`.
+2. Run every file in `supabase/migrations/`, in filename order, in the dashboard's **SQL Editor**. They create the tables, Row Level Security policies, `updated_at` triggers, size limits and the `delete_account()` function.
 3. Go to **Authentication → Sign In / Providers**. Enable **anonymous sign-ins**, keep **Email** enabled, and turn off **Confirm email**. If you leave confirmation on, the app asks for the emailed code instead.
 4. Go to **Authentication → Emails → Reset Password**. Add `{{ .Token }}` to the template, because the app resets passwords with an emailed code rather than a link.
-5. Before launch, set up custom SMTP (Authentication → Emails → SMTP). Supabase's built-in sender only delivers to your own team.
+5. Go to **Authentication → Providers → Email**. Set the minimum password length to 8 and require letters and digits, matching the app's rule.
+6. Before launch, set up custom SMTP (Authentication → Emails → SMTP). Supabase's built-in sender only delivers to your own team.
 
 **Coach (Claude version, currently off):**
 - `supabase/functions/coach` is a Deno edge function. It reads the signed-in user's habits through Row Level Security, builds a digest (`stats.ts`), asks Claude for structured output (`prompt.ts`), and stores the result in `coach_messages`: one per user, kind and period, so each message is paid for once.
-- It needs the `ANTHROPIC_API_KEY` secret (Supabase → Edge Functions → Secrets).
+- It needs the `ANTHROPIC_API_KEY` secret (Supabase → Edge Functions → Secrets). Leave it unset until the Claude coach is switched on. It serves email accounts only; guests get the on-device coach.
 - Deploy with `SUPABASE_ACCESS_TOKEN=… npx supabase functions deploy coach --project-ref <ref> --use-api`.
 - Test the digest with `deno test supabase/functions/coach`.
 
