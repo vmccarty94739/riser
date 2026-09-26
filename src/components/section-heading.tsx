@@ -37,6 +37,9 @@ export function SectionHeading({
         type="subtitle"
         numberOfLines={1}
         adjustsFontSizeToFit
+        // Long titles may shrink a little on small phones, never further: iOS can measure a
+        // heading while its section is still laying out and would otherwise leave it tiny.
+        minimumFontScale={0.75}
         style={[styles.title, sub && styles.subTitle]}>
         {title}
       </ThemedText>

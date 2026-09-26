@@ -145,7 +145,7 @@ Before submitting, create the demo account on a real phone (sign up with an inbo
 | Android adaptive icon + monochrome | ✅ `assets/images/android-icon-*.png` |
 | Splash screen | ✅ `assets/images/splash-icon.png` |
 | Play feature graphic (1024×500) | ✅ `store/feature-graphic.png` |
-| iPhone screenshots — 6.9" (1320×2868) or 6.7" (1290×2796), 3–10 | ⬜ take on a TestFlight/preview build |
+| iPhone screenshots — 6.9" (1320×2868), 3–10 | ✅ `store/screenshots/ios-6.9/` (9, captured on an iPhone 18 Pro Max simulator with the demo data) |
 | Android phone screenshots — 2–8, at least 1080px on the short side | ⬜ take on a preview build |
 
 Good screenshot set: Dashboard, a check-in celebration, Trophy Cabinet, Trend Graph + Calendar, a trophy/level-up pop-up, Break habits, Camera Roll.
