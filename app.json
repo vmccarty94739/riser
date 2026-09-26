@@ -142,6 +142,11 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "owner": "vmccarty"
+    "owner": "vmccarty",
+    "extra": {
+      "eas": {
+        "projectId": "f4656da0-11e6-4012-a29f-36e8102c2db8"
+      }
+    }
   }
 }
