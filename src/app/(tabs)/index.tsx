@@ -212,7 +212,7 @@ export default function DashboardScreen() {
           ]}>
           <ThemedText style={styles.arrowText}>‹</ThemedText>
         </Pressable>
-        <View style={styles.dayLabel}>
+        <View style={[styles.dayLabel, { backgroundColor: theme.backgroundElement }]}>
           {isToday ? (
             <>
               <ThemedText type="smallBold">
@@ -388,6 +388,8 @@ const styles = StyleSheet.create({
   dayLabel: {
     flex: 1,
     alignItems: 'center',
+    borderRadius: Spacing.three,
+    paddingVertical: Spacing.one + 2,
   },
   returnButton: {
     borderRadius: Spacing.five,

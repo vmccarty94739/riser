@@ -251,6 +251,7 @@ export default function ProgressScreen() {
   const theme = useTheme();
   const { habits, challenges, settings } = useHabits();
   const coachFold = useFold('progress:coach');
+  const summaryFold = useFold('progress:summary');
   const trophyFold = useFold('progress:trophies');
   const graphFold = useFold('progress:graph');
   const calendarFold = useFold('progress:calendar');
@@ -327,311 +328,330 @@ export default function ProgressScreen() {
         </>
       )}
 
-      {selector}
-
       <SectionHeading
-        title="Trophy Cabinet"
+        title="Summary"
         accessory={
           <InfoButton
-            title="Trophy Cabinet"
-            text={`Every habit has its own trophy ladder, from 🥉 Kickstart (3 days) to 🐉 Legend (365). Finishing a challenge earns that habit its trophy plus XP toward your level, and the next rung starts the following day. So every habit you add is a fresh climb. The outlined trophy is each habit's next one. This cabinet shows your ${
-              quit ? 'bad' : 'good'
-            } habits; tap a shelf to open the habit, or View all for custom trophies and trophies from deleted habits.`}
+            title="Summary"
+            text="Switch between Good habits (the ones you're building) and Bad habits (the ones you're quitting). Everything below, from trophies and graph to calendar, habit summary and history, shows the side you pick."
           />
         }
-        trailing={
-          <ThemedText type="small" themeColor="textSecondary">
-            {challenges.filter((c) => c.completedAt && c.habitKind === kind).length} earned
-          </ThemedText>
-        }
-        {...trophyFold}
+        {...summaryFold}
       />
-      {trophyFold.open && <Cabinet kind={kind} habits={habits} challenges={challenges} />}
-
-      {!list.length ? (
-        <ThemedText themeColor="textSecondary" style={styles.empty}>
-          {quit
-            ? 'No bad habits yet. Add one from the Break tab on your Dashboard to track clean days.'
-            : 'Add a habit on your Dashboard and your trends will show up here.'}
-        </ThemedText>
-      ) : (
+      {summaryFold.open && (
         <>
+          {selector}
+
           <SectionHeading
-            title="Graph"
+            title="Trophy Cabinet"
             accessory={
               <InfoButton
-                title="Graph"
-                text={`Pick 7, 30 or 90 days. The tiles sum up that period and compare it to the one before. In the chart each bar is a day, week or month, split by habit category: the solid part is what you ${
-                  quit ? 'logged clean' : 'completed'
-                }, the faded part is what you missed. Tap a bar or a category for a breakdown. ${
-                  quit ? 'Longest clean run' : 'Longest perfect streak'
-                } counts the most days in a row where every ${
-                  quit ? 'bad habit was avoided' : 'good habit was done'
-                }.`}
+                title="Trophy Cabinet"
+                text={`Every habit has its own trophy ladder, from 🥉 Kickstart (3 days) to 🐉 Legend (365). Finishing a challenge earns that habit its trophy plus XP toward your level, and the next rung starts the following day. So every habit you add is a fresh climb. The outlined trophy is each habit's next one. This cabinet shows your ${
+                  quit ? 'bad' : 'good'
+                } habits; tap a shelf to open the habit, or View all for custom trophies and trophies from deleted habits.`}
               />
             }
-            {...graphFold}
+            trailing={
+              <ThemedText type="small" themeColor="textSecondary">
+                {challenges.filter((c) => c.completedAt && c.habitKind === kind).length} earned
+              </ThemedText>
+            }
+            {...trophyFold}
           />
-          {graphFold.open && (
+          {trophyFold.open && <Cabinet kind={kind} habits={habits} challenges={challenges} />}
+
+          {!list.length ? (
+            <ThemedText themeColor="textSecondary" style={styles.empty}>
+              {quit
+                ? 'No bad habits yet. Add one from the Break tab on your Dashboard to track clean days.'
+                : 'Add a habit on your Dashboard and your trends will show up here.'}
+            </ThemedText>
+          ) : (
             <>
-              <View style={styles.chips}>
-                {RANGES.map((r) => (
-                  <Chip
-                    key={r}
-                    label={`${r} days`}
-                    selected={range === r}
-                    onPress={() => setRange(r)}
+              <SectionHeading
+                title="Graph"
+                accessory={
+                  <InfoButton
+                    title="Graph"
+                    text={`Pick 7, 30 or 90 days. The tiles sum up that period and compare it to the one before. In the chart each bar is a day, week or month, split by habit category: the solid part is what you ${
+                      quit ? 'logged clean' : 'completed'
+                    }, the faded part is what you missed. Tap a bar or a category for a breakdown. ${
+                      quit ? 'Longest clean run' : 'Longest perfect streak'
+                    } counts the most days in a row where every ${
+                      quit ? 'bad habit was avoided' : 'good habit was done'
+                    }.`}
                   />
-                ))}
-              </View>
-
-              <View style={styles.tiles}>
-                <StatTile
-                  label={quit ? 'Clean rate' : 'Consistency'}
-                  value={rate === null ? '—' : `${Math.round(rate * 100)}%`}
-                  note={
-                    delta === null
-                      ? undefined
-                      : `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)} pts vs prior`
-                  }
-                />
-                <StatTile
-                  label={quit ? 'Longest clean run' : 'Longest perfect streak'}
-                  value={`🔥 ${longestKind}`}
-                  note={longestKind === 1 ? 'day' : 'days'}
-                />
-                <StatTile label={quit ? 'Fully clean days' : 'All-done days'} value={allDays} />
-              </View>
-
-              <ThemedView type="backgroundElement" style={styles.card}>
-                <SegmentedBars key={`${kind}-${range}`} habits={habits} kind={kind} range={range} />
-              </ThemedView>
-            </>
-          )}
-
-          <SectionHeading
-            title="Calendar"
-            accessory={
-              <InfoButton
-                title="Calendar"
-                text={`Your last 16 weeks, day by day. The stronger a day's color, the more of your ${
-                  quit ? 'bad habits you stayed clean from' : 'good habits you completed'
-                }: white means none, full color means all of them. Today is outlined.`}
-              />
-            }
-            {...calendarFold}
-          />
-          {calendarFold.open && (
-            <ThemedView type="backgroundElement" style={styles.card}>
-              <Heatmap
-                habits={list}
-                caption={
-                  quit
-                    ? 'Share of bad habits avoided each day'
-                    : 'Share of good habits done each day'
                 }
+                {...graphFold}
               />
-            </ThemedView>
-          )}
+              {graphFold.open && (
+                <>
+                  <View style={styles.chips}>
+                    {RANGES.map((r) => (
+                      <Chip
+                        key={r}
+                        label={`${r} days`}
+                        selected={range === r}
+                        onPress={() => setRange(r)}
+                      />
+                    ))}
+                  </View>
 
-          <SectionHeading
-            title={`Habit Summary: Past ${range} Days`}
-            accessory={
-              <InfoButton
-                title="Habit Summary"
-                text={`How each habit did in the period you picked: ${
-                  quit ? 'clean days' : 'days completed'
-                } out of the days it existed, the bar showing that share, and 🔥 its current streak. Tap a habit to open it.`}
-              />
-            }
-            {...reportFold}
-          />
-          {reportFold.open && (
-            <ThemedView type="backgroundElement" style={styles.list}>
-              {list.map((habit, i) => {
-                const { done, possible } = daysDone(habit, range);
-                const streak = currentStreak(habit);
-                return (
-                  <Pressable
-                    key={habit.id}
-                    onPress={() => router.push(`/habit/${habit.id}`)}
-                    style={[
-                      styles.habitRow,
-                      i > 0 && {
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderColor: theme.backgroundSelected,
-                      },
-                    ]}>
-                    <HabitIcon icon={habit.emoji} size={20} quit={quit} />
-                    <View style={styles.flex}>
-                      <View style={styles.rowHeader}>
-                        <ThemedText
-                          type="small"
-                          numberOfLines={1}
-                          style={[styles.flex, styles.rowName]}>
-                          {habit.name}
-                        </ThemedText>
-                        <ThemedText type="smallBold" style={styles.rowCount}>
-                          {done}/{possible}
-                          <ThemedText
-                            type="small"
-                            style={[
-                              styles.rowUnit,
-                              { color: quit ? theme.success : theme.textSecondary },
-                            ]}>
-                            {quit ? ' clean' : ' days'}
-                          </ThemedText>
-                        </ThemedText>
-                      </View>
-                      <View style={styles.rowBar}>
-                        <View
-                          style={[
-                            styles.track,
-                            styles.flex,
-                            { backgroundColor: theme.backgroundSelected },
-                          ]}>
-                          <View
-                            style={[
-                              styles.fill,
-                              {
-                                backgroundColor: theme.accent,
-                                width: `${possible ? (done / possible) * 100 : 0}%`,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <ThemedText
-                          type="small"
-                          themeColor="textSecondary"
-                          style={styles.rowStreak}>
-                          {streak > 0 ? `🔥 ${streak}` : '—'}
-                        </ThemedText>
-                      </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ThemedView>
-          )}
-
-          <SectionHeading
-            title="History"
-            accessory={
-              <InfoButton
-                title="History"
-                text={`Every day you've tracked, newest first, with how many habits you ${
-                  quit ? 'stayed clean from' : 'completed'
-                }. Faded icons are the ones you missed. Tap a day to see each habit's result.`}
-              />
-            }
-            {...historyFold}
-          />
-          {historyFold.open && (
-            <ThemedView type="backgroundElement" style={styles.list}>
-              {history.map((day, i) => {
-                const active = activeOn(list, day);
-                const doneCount = active.filter((h) => isDone(h, day)).length;
-                const expanded = openDay === day;
-                const allDone = active.length > 0 && doneCount === active.length;
-                return (
-                  <View
-                    key={day}
-                    style={
-                      i > 0 && {
-                        borderTopWidth: StyleSheet.hairlineWidth,
-                        borderColor: theme.backgroundSelected,
+                  <View style={styles.tiles}>
+                    <StatTile
+                      label={quit ? 'Clean rate' : 'Consistency'}
+                      value={rate === null ? '—' : `${Math.round(rate * 100)}%`}
+                      note={
+                        delta === null
+                          ? undefined
+                          : `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)} pts vs prior`
                       }
-                    }>
-                    <Pressable
-                      onPress={() => setOpenDay(expanded ? null : day)}
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded }}
-                      style={styles.historyRow}>
-                      <View style={styles.historyDate}>
-                        <ThemedText type="smallBold">
-                          {day === today
-                            ? 'Today'
-                            : day === addDays(today, -1)
-                              ? 'Yesterday'
-                              : fmtDay(day, { weekday: 'short' })}
-                        </ThemedText>
-                        <ThemedText
-                          type="small"
-                          themeColor="textSecondary"
-                          style={styles.historySub}>
-                          {fmtDay(day, { month: 'short', day: 'numeric' })}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.historyIcons}>
-                        {active.slice(0, 7).map((h) => (
-                          <View key={h.id} style={!isDone(h, day) && styles.missedIcon}>
-                            <HabitIcon icon={h.emoji} size={17} />
-                          </View>
-                        ))}
-                        {active.length > 7 && (
-                          <ThemedText type="small" themeColor="textSecondary">
-                            +{active.length - 7}
-                          </ThemedText>
-                        )}
-                      </View>
-                      <ThemedText
-                        type="smallBold"
-                        style={{ color: allDone ? theme.success : theme.textSecondary }}>
-                        {doneCount}/{active.length}
-                      </ThemedText>
-                      <View style={[styles.chevronWrap, { backgroundColor: theme.background }]}>
-                        <ThemedText
-                          themeColor="textSecondary"
-                          style={[styles.chevron, expanded && styles.chevronOpen]}>
-                          ›
-                        </ThemedText>
-                      </View>
-                    </Pressable>
-                    {expanded && (
-                      <Animated.View entering={FadeIn} style={styles.historyDetail}>
-                        {active.map((h) => {
-                          const count = countOn(h, day);
-                          const done = isDone(h, day);
-                          return (
-                            <View key={h.id} style={styles.detailRow}>
-                              <HabitIcon icon={h.emoji} size={16} />
-                              <ThemedText type="small" numberOfLines={1} style={styles.flex}>
-                                {h.name}
-                              </ThemedText>
+                    />
+                    <StatTile
+                      label={quit ? 'Longest clean run' : 'Longest perfect streak'}
+                      value={`🔥 ${longestKind}`}
+                      note={longestKind === 1 ? 'day' : 'days'}
+                    />
+                    <StatTile label={quit ? 'Fully clean days' : 'All-done days'} value={allDays} />
+                  </View>
+
+                  <ThemedView type="backgroundElement" style={styles.card}>
+                    <SegmentedBars
+                      key={`${kind}-${range}`}
+                      habits={habits}
+                      kind={kind}
+                      range={range}
+                    />
+                  </ThemedView>
+                </>
+              )}
+
+              <SectionHeading
+                title="Calendar"
+                accessory={
+                  <InfoButton
+                    title="Calendar"
+                    text={`Your last 16 weeks, day by day. The stronger a day's color, the more of your ${
+                      quit ? 'bad habits you stayed clean from' : 'good habits you completed'
+                    }: white means none, full color means all of them. Today is outlined.`}
+                  />
+                }
+                {...calendarFold}
+              />
+              {calendarFold.open && (
+                <ThemedView type="backgroundElement" style={styles.card}>
+                  <Heatmap
+                    habits={list}
+                    caption={
+                      quit
+                        ? 'Share of bad habits avoided each day'
+                        : 'Share of good habits done each day'
+                    }
+                  />
+                </ThemedView>
+              )}
+
+              <SectionHeading
+                title={`Habit Summary: Past ${range} Days`}
+                accessory={
+                  <InfoButton
+                    title="Habit Summary"
+                    text={`How each habit did in the period you picked: ${
+                      quit ? 'clean days' : 'days completed'
+                    } out of the days it existed, the bar showing that share, and 🔥 its current streak. Tap a habit to open it.`}
+                  />
+                }
+                {...reportFold}
+              />
+              {reportFold.open && (
+                <ThemedView type="backgroundElement" style={styles.list}>
+                  {list.map((habit, i) => {
+                    const { done, possible } = daysDone(habit, range);
+                    const streak = currentStreak(habit);
+                    return (
+                      <Pressable
+                        key={habit.id}
+                        onPress={() => router.push(`/habit/${habit.id}`)}
+                        style={[
+                          styles.habitRow,
+                          i > 0 && {
+                            borderTopWidth: StyleSheet.hairlineWidth,
+                            borderColor: theme.backgroundSelected,
+                          },
+                        ]}>
+                        <HabitIcon icon={habit.emoji} size={20} quit={quit} />
+                        <View style={styles.flex}>
+                          <View style={styles.rowHeader}>
+                            <ThemedText
+                              type="small"
+                              numberOfLines={1}
+                              style={[styles.flex, styles.rowName]}>
+                              {habit.name}
+                            </ThemedText>
+                            <ThemedText type="smallBold" style={styles.rowCount}>
+                              {done}/{possible}
                               <ThemedText
                                 type="small"
-                                style={{
-                                  color: done ? theme.success : theme.textSecondary,
-                                  fontWeight: done ? 700 : 500,
-                                }}>
-                                {quit
-                                  ? done
-                                    ? 'Clean ✓'
-                                    : 'Not logged'
-                                  : h.target > 1
-                                    ? `${count}/${h.target}`
-                                    : done
-                                      ? 'Done ✓'
-                                      : 'Missed'}
+                                style={[
+                                  styles.rowUnit,
+                                  { color: quit ? theme.success : theme.textSecondary },
+                                ]}>
+                                {quit ? ' clean' : ' days'}
                               </ThemedText>
+                            </ThemedText>
+                          </View>
+                          <View style={styles.rowBar}>
+                            <View
+                              style={[
+                                styles.track,
+                                styles.flex,
+                                { backgroundColor: theme.backgroundSelected },
+                              ]}>
+                              <View
+                                style={[
+                                  styles.fill,
+                                  {
+                                    backgroundColor: theme.accent,
+                                    width: `${possible ? (done / possible) * 100 : 0}%`,
+                                  },
+                                ]}
+                              />
                             </View>
-                          );
-                        })}
-                      </Animated.View>
-                    )}
-                  </View>
-                );
-              })}
-              {historyDays < totalDays && (
-                <Pressable
-                  onPress={() => setHistoryDays((d) => d + 14)}
-                  style={[styles.more, { borderColor: theme.backgroundSelected }]}>
-                  <ThemedText type="small" style={{ color: theme.accent }}>
-                    Show earlier days
-                  </ThemedText>
-                </Pressable>
+                            <ThemedText
+                              type="small"
+                              themeColor="textSecondary"
+                              style={styles.rowStreak}>
+                              {streak > 0 ? `🔥 ${streak}` : '—'}
+                            </ThemedText>
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ThemedView>
               )}
-            </ThemedView>
+
+              <SectionHeading
+                title="History"
+                accessory={
+                  <InfoButton
+                    title="History"
+                    text={`Every day you've tracked, newest first, with how many habits you ${
+                      quit ? 'stayed clean from' : 'completed'
+                    }. Faded icons are the ones you missed. Tap a day to see each habit's result.`}
+                  />
+                }
+                {...historyFold}
+              />
+              {historyFold.open && (
+                <ThemedView type="backgroundElement" style={styles.list}>
+                  {history.map((day, i) => {
+                    const active = activeOn(list, day);
+                    const doneCount = active.filter((h) => isDone(h, day)).length;
+                    const expanded = openDay === day;
+                    const allDone = active.length > 0 && doneCount === active.length;
+                    return (
+                      <View
+                        key={day}
+                        style={
+                          i > 0 && {
+                            borderTopWidth: StyleSheet.hairlineWidth,
+                            borderColor: theme.backgroundSelected,
+                          }
+                        }>
+                        <Pressable
+                          onPress={() => setOpenDay(expanded ? null : day)}
+                          accessibilityRole="button"
+                          accessibilityState={{ expanded }}
+                          style={styles.historyRow}>
+                          <View style={styles.historyDate}>
+                            <ThemedText type="smallBold">
+                              {day === today
+                                ? 'Today'
+                                : day === addDays(today, -1)
+                                  ? 'Yesterday'
+                                  : fmtDay(day, { weekday: 'short' })}
+                            </ThemedText>
+                            <ThemedText
+                              type="small"
+                              themeColor="textSecondary"
+                              style={styles.historySub}>
+                              {fmtDay(day, { month: 'short', day: 'numeric' })}
+                            </ThemedText>
+                          </View>
+                          <View style={styles.historyIcons}>
+                            {active.slice(0, 7).map((h) => (
+                              <View key={h.id} style={!isDone(h, day) && styles.missedIcon}>
+                                <HabitIcon icon={h.emoji} size={17} />
+                              </View>
+                            ))}
+                            {active.length > 7 && (
+                              <ThemedText type="small" themeColor="textSecondary">
+                                +{active.length - 7}
+                              </ThemedText>
+                            )}
+                          </View>
+                          <ThemedText
+                            type="smallBold"
+                            style={{ color: allDone ? theme.success : theme.textSecondary }}>
+                            {doneCount}/{active.length}
+                          </ThemedText>
+                          <View style={[styles.chevronWrap, { backgroundColor: theme.background }]}>
+                            <ThemedText
+                              themeColor="textSecondary"
+                              style={[styles.chevron, expanded && styles.chevronOpen]}>
+                              ›
+                            </ThemedText>
+                          </View>
+                        </Pressable>
+                        {expanded && (
+                          <Animated.View entering={FadeIn} style={styles.historyDetail}>
+                            {active.map((h) => {
+                              const count = countOn(h, day);
+                              const done = isDone(h, day);
+                              return (
+                                <View key={h.id} style={styles.detailRow}>
+                                  <HabitIcon icon={h.emoji} size={16} />
+                                  <ThemedText type="small" numberOfLines={1} style={styles.flex}>
+                                    {h.name}
+                                  </ThemedText>
+                                  <ThemedText
+                                    type="small"
+                                    style={{
+                                      color: done ? theme.success : theme.textSecondary,
+                                      fontWeight: done ? 700 : 500,
+                                    }}>
+                                    {quit
+                                      ? done
+                                        ? 'Clean ✓'
+                                        : 'Not logged'
+                                      : h.target > 1
+                                        ? `${count}/${h.target}`
+                                        : done
+                                          ? 'Done ✓'
+                                          : 'Missed'}
+                                  </ThemedText>
+                                </View>
+                              );
+                            })}
+                          </Animated.View>
+                        )}
+                      </View>
+                    );
+                  })}
+                  {historyDays < totalDays && (
+                    <Pressable
+                      onPress={() => setHistoryDays((d) => d + 14)}
+                      style={[styles.more, { borderColor: theme.backgroundSelected }]}>
+                      <ThemedText type="small" style={{ color: theme.accent }}>
+                        Show earlier days
+                      </ThemedText>
+                    </Pressable>
+                  )}
+                </ThemedView>
+              )}
+            </>
           )}
         </>
       )}
