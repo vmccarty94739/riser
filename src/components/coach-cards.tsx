@@ -3,8 +3,6 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Segmented } from '@/components/habit-fields';
-import { InfoButton } from '@/components/info-button';
-import { SectionHeading } from '@/components/section-heading';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -12,7 +10,7 @@ import { useCloud } from '@/hooks/use-cloud';
 import { useCoach } from '@/hooks/use-coach';
 import { fmtDay, useHabits } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
-import { COACH_ENGINE, type CoachMessage } from '@/lib/coach';
+import { COACH_ENGINE, type CoachKind, type CoachMessage } from '@/lib/coach';
 import { DEVICE_MODEL_NAME } from '@/lib/coach-device';
 
 const onDevice = COACH_ENGINE === 'device';
@@ -106,75 +104,29 @@ function Failed({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
   );
 }
 
-function CoachHeading() {
-  return (
-    <SectionHeading
-      title="Coach"
-      accessory={<InfoButton title="Your coach" text={COACH_ABOUT} />}
-    />
-  );
-}
-
-/** Dashboard: today's nudge under a "Coach" heading (or the one-time offer to turn it on). */
-export function CoachNudge({ today }: { today: string }) {
+/** Today's nudge: what matters most right now, and a tip for it. */
+function Nudge({ message }: { message: CoachMessage }) {
   const theme = useTheme();
-  const { settings, updateSettings } = useHabits();
-  const visible = useCoachVisible();
-  const { state, message, retry } = useCoach('daily', today);
-
-  if (!visible) return null;
-  if (!onDevice && !settings.coach)
-    return settings.coachAsked ? null : (
-      <>
-        <CoachHeading />
-        <CoachOptIn onDismiss={() => updateSettings({ coachAsked: true })} />
-      </>
-    );
-  if (state === 'loading')
-    return (
-      <>
-        <CoachHeading />
-        <Pending
-          text={
-            onDevice
-              ? 'Your coach is looking at your last two weeks…'
-              : 'Your coach is reading your last two weeks…'
-          }
-        />
-      </>
-    );
-  if (state === 'failed' || state === 'busy')
-    return (
-      <>
-        <CoachHeading />
-        <Failed busy={state === 'busy'} onRetry={retry} />
-      </>
-    );
-  if (state !== 'ready' || !message) return null;
-
   return (
-    <>
-      <CoachHeading />
-      <Animated.View entering={FadeIn}>
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <View style={styles.row}>
-            <ThemedText style={styles.icon}>🧑‍🏫</ThemedText>
-            <View style={styles.flex}>
-              <ThemedText type="smallBold">{message.title}</ThemedText>
-              <ThemedText type="small">{message.body}</ThemedText>
-            </View>
+    <Animated.View entering={FadeIn}>
+      <ThemedView type="backgroundElement" style={styles.card}>
+        <View style={styles.row}>
+          <ThemedText style={styles.icon}>🧑‍🏫</ThemedText>
+          <View style={styles.flex}>
+            <ThemedText type="smallBold">{message.title}</ThemedText>
+            <ThemedText type="small">{message.body}</ThemedText>
           </View>
-          {message.tip && (
-            <ThemedView type="accentSoft" style={styles.tip}>
-              <ThemedText type="small" style={{ color: theme.accent }}>
-                💡 {message.tip}
-              </ThemedText>
-            </ThemedView>
-          )}
-          <Byline message={message} />
-        </ThemedView>
-      </Animated.View>
-    </>
+        </View>
+        {message.tip && (
+          <ThemedView type="accentSoft" style={styles.tip}>
+            <ThemedText type="small" style={{ color: theme.accent }}>
+              💡 {message.tip}
+            </ThemedText>
+          </ThemedView>
+        )}
+        <Byline message={message} />
+      </ThemedView>
+    </Animated.View>
   );
 }
 
@@ -224,11 +176,11 @@ function Report({ message, kind }: { message: CoachMessage; kind: 'weekly' | 'mo
   );
 }
 
-/** Progress Report: the AI weekly / monthly reflection. */
+/** Progress Report: today's nudge and the weekly / monthly reflection. */
 export function CoachReport({ today }: { today: string }) {
   const { settings } = useHabits();
   const visible = useCoachVisible();
-  const [kind, setKind] = useState<'weekly' | 'monthly'>('weekly');
+  const [kind, setKind] = useState<CoachKind>('daily');
   const { state, message, retry } = useCoach(kind, today);
 
   if (!visible || state === 'off') return null;
@@ -238,6 +190,7 @@ export function CoachReport({ today }: { today: string }) {
     <View style={styles.report}>
       <Segmented
         options={[
+          { value: 'daily', label: 'Today' },
           { value: 'weekly', label: 'This week' },
           { value: 'monthly', label: 'This month' },
         ]}
@@ -246,12 +199,20 @@ export function CoachReport({ today }: { today: string }) {
       />
       {state === 'loading' ? (
         <Pending
-          text={`Your coach is writing your ${kind === 'weekly' ? 'weekly' : 'monthly'} report…`}
+          text={
+            kind === 'daily'
+              ? 'Your coach is looking at your last two weeks…'
+              : `Your coach is writing your ${kind === 'weekly' ? 'weekly' : 'monthly'} report…`
+          }
         />
       ) : state === 'failed' || state === 'busy' ? (
         <Failed busy={state === 'busy'} onRetry={retry} />
       ) : message ? (
-        <Report message={message} kind={kind} />
+        kind === 'daily' ? (
+          <Nudge message={message} />
+        ) : (
+          <Report message={message} kind={kind} />
+        )
       ) : null}
     </View>
   );

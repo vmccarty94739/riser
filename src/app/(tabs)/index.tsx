@@ -7,7 +7,6 @@ import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { Challenges } from '@/components/challenge-card';
 import { HabitRow } from '@/components/habit-row';
 import { InfoButton } from '@/components/info-button';
-import { LevelStrip } from '@/components/level-bar';
 import { ScreenScroll } from '@/components/screen-scroll';
 import { SectionHeading, useFold } from '@/components/section-heading';
 import { SettingsButton } from '@/components/settings-button';
@@ -31,7 +30,6 @@ import {
 } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
 import { now } from '@/lib/clock';
-import { CoachNudge } from '@/components/coach-cards';
 import { habitCountOn, tierXp } from '@/lib/xp';
 import { categoriesFor, categoryOf, iconText } from '@/lib/icons';
 
@@ -176,10 +174,6 @@ export default function DashboardScreen() {
 
   return (
     <ScreenScroll title="Dashboard" subtitle={greeting()} action={<SettingsButton />}>
-      {habits.length > 0 && <LevelStrip />}
-
-      <CoachNudge today={today} />
-
       {habits.length > 0 && (
         <SectionHeading
           title={live.length === 1 ? 'Challenge' : 'Challenges'}

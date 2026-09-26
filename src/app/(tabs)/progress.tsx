@@ -251,6 +251,10 @@ export default function ProgressScreen() {
   const theme = useTheme();
   const { habits, challenges, settings } = useHabits();
   const coachFold = useFold('progress:coach');
+  const trophyFold = useFold('progress:trophies');
+  const graphFold = useFold('progress:graph');
+  const calendarFold = useFold('progress:calendar');
+  const reportFold = useFold('progress:report-card');
   const [kind, setKind] = useState<HabitKind>('build');
   const [range, setRange] = useState<Range>(7);
   const [historyDays, setHistoryDays] = useState(7);
@@ -301,7 +305,6 @@ export default function ProgressScreen() {
   const delta = rate !== null && prevRate !== null ? Math.round((rate - prevRate) * 100) : null;
   const allDays = days.filter((d) => dayScore(list, d) === 1).length;
   const longestKind = longestPerfectStreak(list);
-  const longestPerfect = longestPerfectStreak(habits);
 
   const earliest = list.reduce((min, h) => (h.createdAt < min ? h.createdAt : min), today);
   const totalDays = daysBetween(earliest, today) + 1;
@@ -312,25 +315,6 @@ export default function ProgressScreen() {
   return (
     <ScreenScroll title="Progress Report" subtitle="Your consistency" action={<SettingsButton />}>
       <LevelCard />
-      {habits.length > 0 && (
-        <ThemedView type="goldSoft" style={styles.footnote}>
-          <ThemedText style={styles.footFire}>🔥</ThemedText>
-          <ThemedText type="smallBold" style={styles.flex}>
-            Longest perfect streak
-          </ThemedText>
-          <ThemedText type="smallBold" style={[styles.footDays, { color: theme.gold }]}>
-            {longestPerfect} {longestPerfect === 1 ? 'day' : 'days'}
-          </ThemedText>
-          <InfoButton
-            title="Perfect streak"
-            color={theme.gold}
-            text={`Days in a row where every good habit was done and every bad habit was avoided. ${
-              quit ? 'Your longest fully clean run' : 'Your longest run doing every good habit'
-            } is ${longestKind} ${longestKind === 1 ? 'day' : 'days'}.`}
-          />
-        </ThemedView>
-      )}
-
       {habits.length > 0 && (COACH_ENGINE === 'device' ? !settings.coachOff : cloud.configured) && (
         <>
           <SectionHeading
@@ -359,8 +343,9 @@ export default function ProgressScreen() {
             {challenges.filter((c) => c.completedAt && c.habitKind === kind).length} earned
           </ThemedText>
         }
+        {...trophyFold}
       />
-      <Cabinet kind={kind} habits={habits} challenges={challenges} />
+      {trophyFold.open && <Cabinet kind={kind} habits={habits} challenges={challenges} />}
 
       {!list.length ? (
         <ThemedText themeColor="textSecondary" style={styles.empty}>
@@ -377,38 +362,51 @@ export default function ProgressScreen() {
                 title="Graph"
                 text={`Pick 7, 30 or 90 days. The tiles sum up that period and compare it to the one before. In the chart each bar is a day, week or month, split by habit category: the solid part is what you ${
                   quit ? 'logged clean' : 'completed'
-                }, the faded part is what you missed. Tap a bar or a category for a breakdown.`}
+                }, the faded part is what you missed. Tap a bar or a category for a breakdown. ${
+                  quit ? 'Longest clean run' : 'Longest perfect streak'
+                } counts the most days in a row where every ${
+                  quit ? 'bad habit was avoided' : 'good habit was done'
+                }.`}
               />
             }
+            {...graphFold}
           />
-          <View style={styles.chips}>
-            {RANGES.map((r) => (
-              <Chip
-                key={r}
-                label={`${r} days`}
-                selected={range === r}
-                onPress={() => setRange(r)}
-              />
-            ))}
-          </View>
+          {graphFold.open && (
+            <>
+              <View style={styles.chips}>
+                {RANGES.map((r) => (
+                  <Chip
+                    key={r}
+                    label={`${r} days`}
+                    selected={range === r}
+                    onPress={() => setRange(r)}
+                  />
+                ))}
+              </View>
 
-          <View style={styles.tiles}>
-            <StatTile
-              label={quit ? 'Clean rate' : 'Consistency'}
-              value={rate === null ? '—' : `${Math.round(rate * 100)}%`}
-              note={
-                delta === null
-                  ? undefined
-                  : `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)} pts vs prior`
-              }
-            />
-            <StatTile label={quit ? 'Clean days logged' : 'Check-ins met'} value={current.met} />
-            <StatTile label={quit ? 'Fully clean days' : 'All-done days'} value={allDays} />
-          </View>
+              <View style={styles.tiles}>
+                <StatTile
+                  label={quit ? 'Clean rate' : 'Consistency'}
+                  value={rate === null ? '—' : `${Math.round(rate * 100)}%`}
+                  note={
+                    delta === null
+                      ? undefined
+                      : `${delta >= 0 ? '↑' : '↓'} ${Math.abs(delta)} pts vs prior`
+                  }
+                />
+                <StatTile
+                  label={quit ? 'Longest clean run' : 'Longest perfect streak'}
+                  value={`🔥 ${longestKind}`}
+                  note={longestKind === 1 ? 'day' : 'days'}
+                />
+                <StatTile label={quit ? 'Fully clean days' : 'All-done days'} value={allDays} />
+              </View>
 
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <SegmentedBars key={`${kind}-${range}`} habits={habits} kind={kind} range={range} />
-          </ThemedView>
+              <ThemedView type="backgroundElement" style={styles.card}>
+                <SegmentedBars key={`${kind}-${range}`} habits={habits} kind={kind} range={range} />
+              </ThemedView>
+            </>
+          )}
 
           <SectionHeading
             title="Calendar"
@@ -421,15 +419,20 @@ export default function ProgressScreen() {
                 }: white means none, full color means all of them. Today is outlined.`}
               />
             }
+            {...calendarFold}
           />
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <Heatmap
-              habits={list}
-              caption={
-                quit ? 'Share of bad habits avoided each day' : 'Share of good habits done each day'
-              }
-            />
-          </ThemedView>
+          {calendarFold.open && (
+            <ThemedView type="backgroundElement" style={styles.card}>
+              <Heatmap
+                habits={list}
+                caption={
+                  quit
+                    ? 'Share of bad habits avoided each day'
+                    : 'Share of good habits done each day'
+                }
+              />
+            </ThemedView>
+          )}
 
           <SectionHeading
             title="Habit Report Card"
@@ -442,69 +445,75 @@ export default function ProgressScreen() {
                 } out of the days it existed, the bar showing that share, and 🔥 its current streak. Tap a habit to open it.`}
               />
             }
+            {...reportFold}
           />
-          <ThemedView type="backgroundElement" style={styles.list}>
-            {list.map((habit, i) => {
-              const { done, possible } = daysDone(habit, range);
-              const streak = currentStreak(habit);
-              return (
-                <Pressable
-                  key={habit.id}
-                  onPress={() => router.push(`/habit/${habit.id}`)}
-                  style={[
-                    styles.habitRow,
-                    i > 0 && {
-                      borderTopWidth: StyleSheet.hairlineWidth,
-                      borderColor: theme.backgroundSelected,
-                    },
-                  ]}>
-                  <HabitIcon icon={habit.emoji} size={20} quit={quit} />
-                  <View style={styles.flex}>
-                    <View style={styles.rowHeader}>
-                      <ThemedText
-                        type="small"
-                        numberOfLines={1}
-                        style={[styles.flex, styles.rowName]}>
-                        {habit.name}
-                      </ThemedText>
-                      <ThemedText type="smallBold" style={styles.rowCount}>
-                        {done}/{possible}
+          {reportFold.open && (
+            <ThemedView type="backgroundElement" style={styles.list}>
+              {list.map((habit, i) => {
+                const { done, possible } = daysDone(habit, range);
+                const streak = currentStreak(habit);
+                return (
+                  <Pressable
+                    key={habit.id}
+                    onPress={() => router.push(`/habit/${habit.id}`)}
+                    style={[
+                      styles.habitRow,
+                      i > 0 && {
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderColor: theme.backgroundSelected,
+                      },
+                    ]}>
+                    <HabitIcon icon={habit.emoji} size={20} quit={quit} />
+                    <View style={styles.flex}>
+                      <View style={styles.rowHeader}>
                         <ThemedText
                           type="small"
-                          style={[
-                            styles.rowUnit,
-                            { color: quit ? theme.success : theme.textSecondary },
-                          ]}>
-                          {quit ? ' clean' : ' days'}
+                          numberOfLines={1}
+                          style={[styles.flex, styles.rowName]}>
+                          {habit.name}
                         </ThemedText>
-                      </ThemedText>
-                    </View>
-                    <View style={styles.rowBar}>
-                      <View
-                        style={[
-                          styles.track,
-                          styles.flex,
-                          { backgroundColor: theme.backgroundSelected },
-                        ]}>
+                        <ThemedText type="smallBold" style={styles.rowCount}>
+                          {done}/{possible}
+                          <ThemedText
+                            type="small"
+                            style={[
+                              styles.rowUnit,
+                              { color: quit ? theme.success : theme.textSecondary },
+                            ]}>
+                            {quit ? ' clean' : ' days'}
+                          </ThemedText>
+                        </ThemedText>
+                      </View>
+                      <View style={styles.rowBar}>
                         <View
                           style={[
-                            styles.fill,
-                            {
-                              backgroundColor: theme.accent,
-                              width: `${possible ? (done / possible) * 100 : 0}%`,
-                            },
-                          ]}
-                        />
+                            styles.track,
+                            styles.flex,
+                            { backgroundColor: theme.backgroundSelected },
+                          ]}>
+                          <View
+                            style={[
+                              styles.fill,
+                              {
+                                backgroundColor: theme.accent,
+                                width: `${possible ? (done / possible) * 100 : 0}%`,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <ThemedText
+                          type="small"
+                          themeColor="textSecondary"
+                          style={styles.rowStreak}>
+                          {streak > 0 ? `🔥 ${streak}` : '—'}
+                        </ThemedText>
                       </View>
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.rowStreak}>
-                        {streak > 0 ? `🔥 ${streak}` : '—'}
-                      </ThemedText>
                     </View>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </ThemedView>
+                  </Pressable>
+                );
+              })}
+            </ThemedView>
+          )}
 
           <SectionHeading
             title="History"
@@ -805,21 +814,6 @@ const styles = StyleSheet.create({
   fill: {
     height: '100%',
     borderRadius: 3,
-  },
-  footnote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
-  },
-  footFire: {
-    fontSize: 24,
-    lineHeight: 30,
-  },
-  footDays: {
-    fontSize: 16,
   },
   historyRow: {
     flexDirection: 'row',

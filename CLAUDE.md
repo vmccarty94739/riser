@@ -121,7 +121,7 @@ The user designs by five layers; check new work against them: **core function** 
   - Before switching: run `eval.ts` to choose the cheapest passing daily setup, and restore the Anthropic paragraphs in `store/PRIVACY_POLICY.md`/`STORE_LISTING.md` (see git history).
   - The global cap is 3,000 messages/24h, and dates more than ±2 days from the server's are rejected.
 - **Periods:** `daily` covers the last 14 days incl. today (today counts as "not yet", never a miss) and is written once per day. `weekly` covers the last 7 full days, once per Monday-week. `monthly` covers the last 30 full days, once per month. Messages are cached on the phone (`riser.coach.v2`), and `useCoach` waits for that cache before writing so launches don't rewrite them.
-- **UI:** `CoachNudge` sits on the Dashboard under the level strip, and `CoachReport` under "Coach's Report" on the Progress Report. The latest daily nudge becomes the next morning notification (`planReminders(…, coach)`).
+- **UI:** `CoachReport` sits under "Coach's Report" on the Progress Report (Today / This week / This month). `ReminderSync` in `_layout.tsx` writes the daily nudge in the background, and it becomes the next morning notification (`planReminders(…, coach)`).
 - **Function ops:** `supabase/functions/**` is excluded from the app's tsconfig/ESLint. Type-check with `deno check supabase/functions/coach/index.ts` from the function dir, test with `deno test supabase/functions/coach`, and deploy with `SUPABASE_ACCESS_TOKEN=… npx supabase functions deploy coach --project-ref <ref> --use-api`. Deno refuses npm versions newer than 24h, so pin slightly older ones.
 
 ### UI conventions

@@ -104,7 +104,7 @@ Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and po
 Riser works offline and needs no sign-in: data is backed up to an anonymous account automatically.
 An optional email + password account can be created during onboarding (skippable) or in Settings,
 and permanently deleted in Settings → Account → "Delete account" (or Settings → Erase all data).
-Reminders are local notifications. The coach (Dashboard card, Progress Report) runs entirely on the
+Reminders are local notifications. The coach (Progress Report, morning notification) runs entirely on the
 device; no habit data is sent to any AI service.
 Camera and photo access are only requested when the user adds a proof photo to a completed habit.
 ```
@@ -122,7 +122,7 @@ Camera and photo access are only requested when the user adds a proof photo to a
 | iPhone screenshots — 6.9" (1320×2868) or 6.7" (1290×2796), 3–10 | ⬜ take on a TestFlight/preview build |
 | Android phone screenshots — 2–8, at least 1080px on the short side | ⬜ take on a preview build |
 
-Good screenshot set: Dashboard (with a perfect streak), a check-in celebration, Trophy Cabinet, Trend Graph + Calendar, a trophy/level-up pop-up, Break habits, Camera Roll.
+Good screenshot set: Dashboard, a check-in celebration, Trophy Cabinet, Trend Graph + Calendar, a trophy/level-up pop-up, Break habits, Camera Roll.
 
 ---
 

@@ -1,6 +1,5 @@
-import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -72,31 +71,6 @@ export function LevelBadge({ level, size = 40 }: { level: number; size?: number 
   );
 }
 
-/** Compact level strip for the Dashboard; tap to open Progress Report. */
-export function LevelStrip() {
-  const xp = useXp();
-  return (
-    <Pressable
-      onPress={() => router.navigate('/progress')}
-      accessibilityLabel={`Level ${xp.level}, open Progress Report`}>
-      <ThemedView type="backgroundElement" style={styles.strip}>
-        <LevelBadge level={xp.level} size={32} />
-        <View style={styles.flex}>
-          <View style={styles.stripTop}>
-            <ThemedText type="smallBold">
-              Level {xp.level} · {xp.rank}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.nums}>
-              {xp.into}/{xp.needed} XP
-            </ThemedText>
-          </View>
-          <XpBar progress={xp.progress} height={6} />
-        </View>
-      </ThemedView>
-    </Pressable>
-  );
-}
-
 /** Full level card for Progress Report: rank, bar, where XP comes from, and the next unlock. */
 export function LevelCard() {
   const theme = useTheme();
@@ -165,24 +139,6 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontWeight: 800,
-  },
-  strip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two + 2,
-    borderRadius: Spacing.four,
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-  },
-  stripTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 4,
-  },
-  nums: {
-    fontSize: 12,
-    fontVariant: ['tabular-nums'],
   },
   card: {
     borderRadius: Spacing.four,

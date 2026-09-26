@@ -7,7 +7,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Appearance, AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { HabitsProvider, useHabits } from '@/hooks/use-habits';
+import { useCoach } from '@/hooks/use-coach';
+import { dayKey, HabitsProvider, useHabits } from '@/hooks/use-habits';
 import { CloudProvider, useCloud } from '@/hooks/use-cloud';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { RewardsProvider } from '@/hooks/use-rewards';
@@ -115,6 +116,8 @@ function DevDemoLink() {
 function ReminderSync() {
   const { loaded, habits, challenges, settings } = useHabits();
   const cloud = useCloud();
+  // Writes today's coach nudge even if Progress isn't opened, for the morning notification.
+  useCoach('daily', dayKey());
   const daily = useSyncExternalStore(subscribeCoach, () => coachMessage('daily', cloud.user?.id));
   const coachOn = COACH_ENGINE === 'device' ? !settings.coachOff : settings.coach;
   const coach =
