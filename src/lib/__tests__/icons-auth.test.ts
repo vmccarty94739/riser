@@ -33,6 +33,7 @@ describe('auth forms', () => {
   it('explains Supabase errors in plain words', () => {
     expect(authMessage({ code: 'invalid_credentials' })).toMatch(/don’t match/);
     expect(authMessage({ name: 'AuthRetryableFetchError', status: 0 })).toMatch(/offline/);
+    expect(authMessage({ code: 'email_not_confirmed' })).toMatch(/Forgot password/);
   });
 
   it('requires 8+ characters mixing letters and numbers', () => {

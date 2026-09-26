@@ -23,6 +23,8 @@ const MESSAGES: Record<string, string> = {
   weak_password: 'Pick a stronger password.',
   same_password: 'Pick a password you haven’t used here before.',
   email_address_invalid: 'Enter a valid email address.',
+  email_not_confirmed:
+    'Confirm your email first: tap “Forgot password?” and we’ll email you a code.',
   otp_expired: 'That code is wrong or expired. Request a new one.',
   over_email_send_rate_limit: 'Too many emails. Wait a minute and try again.',
   over_request_rate_limit: 'Too many tries. Wait a minute and try again.',

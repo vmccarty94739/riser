@@ -1,0 +1,7 @@
+{
+  "name": "decode-uri-component",
+  "version": "0.5.0",
+  "description": "Vendored CommonJS copy of decode-uri-component 0.5.0, the release that fixes GHSA-vcc3-ghjq-m6fr. Upstream 0.5.0 is ESM-only, but query-string@7 (used by expo-router) require()s it, so package.json overrides it with this copy. Drop it once expo-router ships a fixed query-string.",
+  "license": "MIT",
+  "main": "index.js"
+}

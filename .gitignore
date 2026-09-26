@@ -31,8 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files (cloud builds get the public Supabase values from eas.json)
-.env
-.env*.local
+.env*
+!.env.example
 
 # Supabase CLI state
 supabase/.temp/
