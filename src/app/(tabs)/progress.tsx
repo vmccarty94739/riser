@@ -10,7 +10,7 @@ import { HabitIcon } from '@/components/habit-icon';
 import { InfoButton } from '@/components/info-button';
 import { LevelCard } from '@/components/level-bar';
 import { ScreenScroll } from '@/components/screen-scroll';
-import { SectionHeading } from '@/components/section-heading';
+import { SectionHeading, useFold } from '@/components/section-heading';
 import { SettingsButton } from '@/components/settings-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -250,6 +250,7 @@ function TrophyLine({ challenge, habits }: { challenge: Challenge; habits: Habit
 export default function ProgressScreen() {
   const theme = useTheme();
   const { habits, challenges, settings } = useHabits();
+  const coachFold = useFold('progress:coach');
   const [kind, setKind] = useState<HabitKind>('build');
   const [range, setRange] = useState<Range>(7);
   const [historyDays, setHistoryDays] = useState(7);
@@ -335,8 +336,9 @@ export default function ProgressScreen() {
           <SectionHeading
             title="Coach's Report"
             accessory={<InfoButton title="Coach's Report" text={COACH_ABOUT} />}
+            {...coachFold}
           />
-          <CoachReport today={today} />
+          {coachFold.open && <CoachReport today={today} />}
         </>
       )}
 

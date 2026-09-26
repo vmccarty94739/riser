@@ -8,9 +8,8 @@ import { Challenges } from '@/components/challenge-card';
 import { HabitRow } from '@/components/habit-row';
 import { InfoButton } from '@/components/info-button';
 import { LevelStrip } from '@/components/level-bar';
-import { ProgressRing } from '@/components/progress-ring';
 import { ScreenScroll } from '@/components/screen-scroll';
-import { SectionHeading } from '@/components/section-heading';
+import { SectionHeading, useFold } from '@/components/section-heading';
 import { SettingsButton } from '@/components/settings-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -25,7 +24,6 @@ import {
   fmtDay,
   isDone,
   nextChallengeLength,
-  perfectStreak,
   tierFor,
   useHabits,
   type Habit,
@@ -34,7 +32,6 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { now } from '@/lib/clock';
 import { CoachNudge } from '@/components/coach-cards';
-import { dailyLine } from '@/lib/daily-lines';
 import { habitCountOn, tierXp } from '@/lib/xp';
 import { categoriesFor, categoryOf, iconText } from '@/lib/icons';
 
@@ -54,6 +51,7 @@ export default function DashboardScreen() {
   // Each page's natural height, so the pager is only as tall as the page on screen.
   const [heights, setHeights] = useState<[number, number]>([0, 0]);
   const pager = useRef<ScrollView>(null);
+  const challengesFold = useFold('dash:challenges');
   const [prompt, setPrompt] = useState<{ text: string; key: number } | null>(null);
 
   useEffect(() => {
@@ -66,9 +64,6 @@ export default function DashboardScreen() {
   const dayHabits = activeOn(habits, day);
   const build = dayHabits.filter((h) => h.kind === 'build');
   const quit = dayHabits.filter((h) => h.kind === 'quit');
-  const doneCount = dayHabits.filter((h) => isDone(h, day)).length;
-  const allDone = dayHabits.length > 0 && doneCount === dayHabits.length;
-  const perfect = perfectStreak(habits);
   const isToday = offset === 0;
 
   const warn = (text: string) => {
@@ -105,18 +100,6 @@ export default function DashboardScreen() {
           return { habit, length, tier: tierFor(length) };
         })()
       : null;
-
-  const headline = !dayHabits.length
-    ? 'Nothing to log'
-    : allDone
-      ? 'Perfect day ✨'
-      : doneCount === 0
-        ? isToday
-          ? 'Let’s get the first one'
-          : 'Nothing logged'
-        : dayHabits.length - doneCount === 1
-          ? 'One to go'
-          : 'Keep the momentum';
 
   const renderPage = (list: Habit[], kind: HabitKind, index: 0 | 1) => {
     const sections = categoriesFor(kind)
@@ -200,6 +183,7 @@ export default function DashboardScreen() {
       {habits.length > 0 && (
         <SectionHeading
           title={live.length === 1 ? 'Challenge' : 'Challenges'}
+          {...challengesFold}
           accessory={
             <InfoButton
               title="Challenges"
@@ -215,9 +199,9 @@ export default function DashboardScreen() {
           }
         />
       )}
-      {live.length > 0 && <Challenges entries={live} />}
+      {challengesFold.open && live.length > 0 && <Challenges entries={live} />}
 
-      {suggestion && (
+      {challengesFold.open && suggestion && (
         <ThemedView type="backgroundElement" style={styles.suggest}>
           <ThemedText style={styles.suggestIcon}>{suggestion.tier.icon}</ThemedText>
           <View style={styles.flex}>
@@ -249,34 +233,6 @@ export default function DashboardScreen() {
           />
         }
       />
-
-      {dayHabits.length > 0 && (
-        <ThemedView type={allDone ? 'goldSoft' : 'backgroundElement'} style={styles.hero}>
-          <ProgressRing
-            size={60}
-            stroke={7}
-            progress={doneCount / dayHabits.length}
-            color={allDone ? theme.gold : theme.accent}
-            trackColor={theme.backgroundSelected}>
-            <ThemedText type="smallBold">
-              {doneCount}/{dayHabits.length}
-            </ThemedText>
-          </ProgressRing>
-          <View style={styles.flex}>
-            <ThemedText type="smallBold" style={{ color: allDone ? theme.gold : theme.accent }}>
-              {headline}
-            </ThemedText>
-            <ThemedText type="small" style={{ color: perfect ? theme.gold : theme.textSecondary }}>
-              {perfect > 0
-                ? `⭐ ${perfect}-day perfect streak`
-                : '⭐ Start a perfect-day streak today'}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.heroNote}>
-              {dailyLine()}
-            </ThemedText>
-          </View>
-        </ThemedView>
-      )}
 
       {/* Day navigator: log today or fix past days, never the future. */}
       <View style={styles.dayNav}>
@@ -443,18 +399,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.three,
-  },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    borderRadius: Spacing.four,
-    padding: Spacing.two + Spacing.one,
-  },
-  heroNote: {
-    fontStyle: 'italic',
-    fontSize: 12,
-    lineHeight: 16,
   },
   dayNav: {
     flexDirection: 'row',
