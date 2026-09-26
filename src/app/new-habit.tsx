@@ -7,6 +7,7 @@ import { SheetScreen } from '@/components/sheet-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useEnableReminders } from '@/hooks/use-enable-reminders';
 import { useHabits } from '@/hooks/use-habits';
 import { useRewards } from '@/hooks/use-rewards';
 import { useTheme } from '@/hooks/use-theme';
@@ -14,6 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 export default function NewHabitScreen() {
   const theme = useTheme();
   const { addHabit, startChallenge } = useHabits();
+  const enableReminders = useEnableReminders();
   const { feedback, confetti } = useRewards();
   const params = useLocalSearchParams<{ kind?: string }>();
   const [habit, setHabit] = useState(() => emptyHabit(params.kind === 'quit' ? 'quit' : 'build'));
@@ -24,6 +26,7 @@ export default function NewHabitScreen() {
   const save = () => {
     if (!valid) return;
     const created = addHabit({ ...habit, name: habit.name.trim(), note: habit.note.trim() });
+    if (habit.reminders.length) enableReminders();
     if (challenge) startChallenge(created.id, 3);
     router.back();
     // Creating a habit is a win too.

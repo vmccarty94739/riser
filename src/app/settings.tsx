@@ -27,7 +27,7 @@ import { useRewards } from '@/hooks/use-rewards';
 import { useTheme } from '@/hooks/use-theme';
 import { useXp } from '@/hooks/use-xp';
 import { CHIMES } from '@/lib/xp';
-import { ensurePermission, sendTestReminder } from '@/lib/reminders';
+import { ensurePermission, listScheduled, sendTestReminder } from '@/lib/reminders';
 
 /** A daily reminder: on/off plus its time on the wheel picker. */
 function TimeRow({
@@ -57,6 +57,38 @@ function TimeRow({
       <TimeField value={time} title={title} onChange={onTime} disabled={!on} />
       <Switch value={on} onValueChange={onToggle} trackColor={{ true: theme.accent }} />
     </ThemedView>
+  );
+}
+
+/**
+ * What's actually scheduled on this phone right now: the next notification and how many are
+ * queued. Read back from the system, so it proves the reminders exist rather than assuming it.
+ */
+function NextReminder() {
+  const { habits, challenges, settings } = useHabits();
+  const [next, setNext] = useState<{ title: string; when: Date; count: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    // Give the reminder sync (debounced) a moment to finish before reading it back.
+    const timer = setTimeout(async () => {
+      const all = (await listScheduled()).filter((n) => n.when > new Date());
+      if (live) setNext(all[0] ? { ...all[0], count: all.length } : null);
+    }, 2000);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [habits, challenges, settings]);
+  if (!next) return null;
+  const today = new Date().toDateString() === next.when.toDateString();
+  const time = next.when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const day = today
+    ? 'Today'
+    : next.when.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  return (
+    <ThemedText type="small" themeColor="textSecondary" style={styles.sub}>
+      Next: {next.title} · {day} {time} ({next.count} scheduled)
+    </ThemedText>
   );
 }
 
@@ -259,6 +291,7 @@ export default function SettingsScreen() {
             </ThemedText>
           </Pressable>
         )}
+        {settings.reminders && !blocked && native && <NextReminder />}
         {settings.reminders && (
           <>
             <TimeRow

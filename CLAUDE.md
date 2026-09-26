@@ -81,6 +81,9 @@ The user designs by five layers; check new work against them: **core function** 
 - **`src/lib/reminders.ts`** uses local notifications only.
   - `planReminders` builds the next 7 days from live state, capped at 60 (the iOS limit is 64): a morning intention, per-habit times, and an evening nudge that names the streak or challenge at risk and is skipped once everything's done.
   - `syncReminders` runs through a queue with a generation counter, so overlapping syncs can't duplicate notifications. `ReminderSync` re-runs it on every state change and on app foreground.
+  - Sync is a **diff**, never clear-then-rebuild: each planned nudge gets a content-derived id (`reminderId`), so only removed ones are cancelled and only new ones scheduled, soonest first. If iOS suspends the app mid-sync, what's already scheduled survives. Ids starting `riser-test-` (the Settings test nudge) are left alone. Tested against a fake scheduler in `reminders-sync.test.ts`.
+  - Notifications show as banners with sound even while the app is open.
+  - Giving a habit a reminder time calls `useEnableReminders`, which asks permission and turns on `settings.reminders` (the master switch). Before, a reminder set with the switch off silently never arrived. The habit page warns when its reminder can't arrive, and Settings shows the next notification actually scheduled on the phone (`listScheduled`).
 - **Proof photos** (`src/lib/proofs.ts`) are copied into `Documents/proofs/` and stored by file name only, because iOS container paths change between updates. Resolve them with `proofUri()`.
 
 ### Cloud sync and auth (Supabase)

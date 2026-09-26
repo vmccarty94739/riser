@@ -11,6 +11,7 @@ import { SheetScreen } from '@/components/sheet-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useEnableReminders } from '@/hooks/use-enable-reminders';
 import {
   bestStreak,
   challengeStatus,
@@ -48,7 +49,9 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 export default function HabitScreen() {
   const theme = useTheme();
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
-  const { habits, challenges, updateHabit, removeHabit, startChallenge, setProof } = useHabits();
+  const { habits, challenges, updateHabit, removeHabit, startChallenge, setProof, settings } =
+    useHabits();
+  const enableReminders = useEnableReminders();
   const habit = habits.find((h) => h.id === id);
   // Opened via "Edit habit" from the Dashboard: start straight in edit mode.
   const [draft, setDraft] = useState<NewHabit | null>(() => {
@@ -103,6 +106,7 @@ export default function HabitScreen() {
     const save = () => {
       if (!valid) return;
       updateHabit(habit.id, { ...draft, name: draft.name.trim(), note: draft.note.trim() });
+      if (draft.reminders.length) enableReminders();
       setDraft(null);
     };
     return (
@@ -180,6 +184,17 @@ export default function HabitScreen() {
           )}
         </View>
       </View>
+
+      {habit.reminders.length > 0 && !settings.reminders && Platform.OS !== 'web' && (
+        <Pressable
+          onPress={enableReminders}
+          accessibilityRole="button"
+          style={[styles.remindersOff, { backgroundColor: theme.dangerSoft }]}>
+          <ThemedText type="small" style={{ color: theme.danger }}>
+            🔕 Notifications are off, so this reminder won’t arrive. Tap to turn them on.
+          </ThemedText>
+        </Pressable>
+      )}
 
       <View style={styles.tiles}>
         <Stat label={quit ? 'Clean streak' : 'Streak'} value={`🔥 ${currentStreak(habit)}`} />
@@ -331,6 +346,11 @@ export default function HabitScreen() {
 }
 
 const styles = StyleSheet.create({
+  remindersOff: {
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+  },
   hero: {
     alignItems: 'center',
     gap: Spacing.one,

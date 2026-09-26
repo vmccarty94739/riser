@@ -34,16 +34,13 @@ const supported = Platform.OS !== 'web';
 
 if (supported) {
   Notifications.setNotificationHandler({
-    // If the app is already open, the nudge has done its job — keep it quiet (except test sends).
-    handleNotification: async (notification) => {
-      const test = notification.request.content.data?.test === true;
-      return {
-        shouldPlaySound: test,
-        shouldSetBadge: false,
-        shouldShowBanner: test,
-        shouldShowList: true,
-      };
-    },
+    // Show reminders even while Riser is open: a reminder the user set must always be seen.
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
   });
 }
 
@@ -273,6 +270,21 @@ export function syncReminders(
   return run;
 }
 
+/** Scheduled nudges get ids from their content, so an unchanged plan needs no native calls. */
+const PREFIX = 'riser-';
+const TEST_PREFIX = 'riser-test-';
+
+export function reminderId(p: Planned) {
+  let h = 0;
+  for (const c of `${p.date.getTime()}|${p.title}|${p.body}`) h = (h * 31 + c.charCodeAt(0)) | 0;
+  return `${PREFIX}${p.date.getTime().toString(36)}-${(h >>> 0).toString(36)}`;
+}
+
+/**
+ * Brings the phone's scheduled notifications in line with the plan: cancels only what's no longer
+ * wanted and adds only what's missing, soonest first. Nothing is ever cleared up front, so if
+ * iOS suspends the app mid-sync the reminders already scheduled stay scheduled.
+ */
 async function runSync(
   mine: number,
   habits: Habit[],
@@ -282,13 +294,23 @@ async function runSync(
   pushText: Record<string, string>
 ) {
   if (mine !== generation) return;
-  await Notifications.cancelAllScheduledNotificationsAsync();
   // Time travel (developer tools) would schedule on the wrong real dates.
-  if (clockOffset() !== 0) return;
-  if (!settings.reminders || !(await ensurePermission(false))) return;
-  for (const p of planReminders(habits, challenges, settings, coach, pushText)) {
+  const off = clockOffset() !== 0 || !settings.reminders || !(await ensurePermission(false));
+  const plan = off ? [] : planReminders(habits, challenges, settings, coach, pushText);
+  const want = new Map(plan.map((p) => [reminderId(p), p]));
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
     if (mine !== generation) return;
+    // Leave a "send me a test nudge" alone; everything else not in the plan goes.
+    if (n.identifier.startsWith(TEST_PREFIX) || want.has(n.identifier)) continue;
+    await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  }
+  const have = new Set(scheduled.map((n) => n.identifier));
+  for (const [identifier, p] of want) {
+    if (mine !== generation) return;
+    if (have.has(identifier) || p.date <= new Date()) continue;
     await Notifications.scheduleNotificationAsync({
+      identifier,
       content: { title: p.title, body: p.body, sound: 'default' },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -296,6 +318,14 @@ async function runSync(
         channelId: CHANNEL,
       },
     });
+  }
+  if (__DEV__) {
+    const next = plan[0];
+    console.log(
+      `[reminders] ${off ? 'off' : `${want.size} scheduled`}${
+        next ? `; next: ${next.title} at ${next.date.toLocaleString()}` : ''
+      }`
+    );
   }
 }
 
@@ -314,6 +344,7 @@ export async function sendTestReminder(
     evening: '23:59',
   })[0];
   await Notifications.scheduleNotificationAsync({
+    identifier: `${TEST_PREFIX}${Date.now()}`,
     content: {
       title: sample?.title ?? 'Riser 🌱',
       body: sample?.body ?? 'This is how your daily check-ins will look.',

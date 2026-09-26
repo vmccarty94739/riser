@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { TimeField } from '@/components/time-picker';
+import { useEnableReminders } from '@/hooks/use-enable-reminders';
 import { minutesOf, NOTE_MAX, type HabitKind, type NewHabit } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
 import { BUILD_GROUPS, DEFAULT_BUILD_ICON, DEFAULT_QUIT_ICON, QUIT_GROUPS } from '@/lib/icons';
@@ -119,6 +120,7 @@ export function HabitFields({
   autoFocus?: boolean;
 }) {
   const theme = useTheme();
+  const enableReminders = useEnableReminders();
   const set = (patch: Partial<NewHabit>) => onChange({ ...value, ...patch });
   const quit = value.kind === 'quit';
   const volume = !quit && value.target > 1;
@@ -137,8 +139,11 @@ export function HabitFields({
   const setTime = (i: number, t: string) =>
     set({ reminders: sortTimes(value.reminders.map((r, j) => (j === i ? t : r))) });
   const removeTime = (i: number) => set({ reminders: value.reminders.filter((_, j) => j !== i) });
-  const addTime = () =>
+  // Asking for a reminder turns notifications on (and asks the phone's permission) right away.
+  const addTime = () => {
     set({ reminders: sortTimes([...value.reminders, nextTime(value.reminders)]) });
+    enableReminders();
+  };
 
   return (
     <>
@@ -324,7 +329,10 @@ export function HabitFields({
             )}
             <Switch
               value={value.reminders.length > 0}
-              onValueChange={(on) => set({ reminders: on ? [quit ? '21:00' : '09:00'] : [] })}
+              onValueChange={(on) => {
+                set({ reminders: on ? [quit ? '21:00' : '09:00'] : [] });
+                if (on) enableReminders();
+              }}
               trackColor={{ true: theme.accent }}
             />
           </ThemedView>
