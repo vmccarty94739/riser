@@ -60,6 +60,7 @@ export function Chip({
   const theme = useTheme();
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={() => {
         tap();
         onPress();
@@ -93,6 +94,7 @@ export function Segmented<T extends string>({
         const selected = o.value === value;
         return (
           <Pressable
+            accessibilityRole="button"
             key={o.value}
             onPress={() => {
               tap();
@@ -194,6 +196,8 @@ export function HabitFields({
                     const selected = q.icon === value.emoji;
                     return (
                       <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: selected }}
                         key={q.icon}
                         onPress={() => {
                           tap();
@@ -224,6 +228,8 @@ export function HabitFields({
                 <View style={styles.emojiRow}>
                   {group.icons.map((e) => (
                     <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: e === value.emoji }}
                       key={e}
                       onPress={() => {
                         tap();
@@ -299,6 +305,7 @@ export function HabitFields({
                 onChange={(next) => setTime(i, next)}
               />
               <Pressable
+                accessibilityRole="button"
                 onPress={() => removeTime(i)}
                 hitSlop={10}
                 accessibilityLabel="Remove time">
@@ -309,7 +316,10 @@ export function HabitFields({
             </ThemedView>
           ))}
           {value.reminders.length < value.target && (
-            <Pressable onPress={addTime} style={[styles.addTime, { borderColor: theme.accent }]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={addTime}
+              style={[styles.addTime, { borderColor: theme.accent }]}>
               <ThemedText type="small" style={{ color: theme.accent }}>
                 + Add a check-in time
               </ThemedText>
@@ -358,6 +368,7 @@ function TypeCard({
   const theme = useTheme();
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={() => {
         tap();
         onPress();
@@ -390,6 +401,9 @@ function StepButton({
   const theme = useTheme();
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label === '+' ? 'Increase' : 'Decrease'}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={() => {
         tap();

@@ -11,6 +11,7 @@ export function SettingsButton() {
   const theme = useTheme();
   return (
     <Pressable
+      accessibilityRole="button"
       accessibilityLabel="Settings"
       onPress={() => router.push('/settings')}
       hitSlop={12}

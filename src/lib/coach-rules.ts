@@ -64,7 +64,7 @@ const QUIT_TIPS: [RegExp, string][] = [
   ],
   [/swear|curs/i, 'Pick a replacement word and use it on purpose the next time you slip.'],
   [
-    /porn/i,
+    /porn|adult content/i,
     'Keep your phone out of the bedroom tonight. The easiest urge to beat is the one you never meet.',
   ],
   [

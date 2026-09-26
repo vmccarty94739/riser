@@ -99,11 +99,49 @@ export function HabitRow({ habit, day }: { habit: Habit; day: string }) {
   const status =
     habit.target > 1 ? `${count} of ${habit.target} today` : done ? 'Done today' : 'Not done yet';
 
+  // VoiceOver sees the row as one element (it would otherwise hide the ring and camera inside it),
+  // so the ring, camera and long-press menu are offered as its swipe-up/down actions.
+  // A single check-in toggles; a multi-check-in habit counts up, then only undo takes one away.
+  const multi = habit.target > 1;
+  const checkInLabel = quit
+    ? done
+      ? 'Undo clean log'
+      : 'Log clean today'
+    : multi
+      ? done
+        ? null
+        : `Log one (${count} of ${habit.target})`
+      : done
+        ? 'Mark not done'
+        : 'Mark done';
+  const spokenStatus = quit ? (done ? 'Clean today' : 'Not logged yet') : status;
+  const open = () => router.push(`/habit/${habit.id}`);
+  const onAction = (name: string) => {
+    if (name === 'checkIn') press();
+    else if (name === 'undo') undo(habit, day);
+    else if (name === 'proof') void addProof();
+    else if (name === 'edit') openActions();
+  };
+
   return (
     <Pressable
-      onPress={() => router.push(`/habit/${habit.id}`)}
+      onPress={open}
       onLongPress={openActions}
       delayLongPress={450}
+      accessibilityRole="button"
+      accessibilityLabel={`${habit.name}${habit.note ? `, ${habit.note}` : ''}. ${spokenStatus}${
+        streak > 0 ? `, ${streak}-day streak` : ''
+      }`}
+      accessibilityHint="Opens the habit. Swipe up or down to check in."
+      accessibilityActions={[
+        ...(checkInLabel ? [{ name: 'checkIn', label: checkInLabel }] : []),
+        ...(multi && count > 0 ? [{ name: 'undo', label: 'Undo one' }] : []),
+        ...(!quit && done
+          ? [{ name: 'proof', label: proof ? 'Change proof photo' : 'Add a proof photo' }]
+          : []),
+        { name: 'edit', label: 'Edit or delete' },
+      ]}
+      onAccessibilityAction={(e) => onAction(e.nativeEvent.actionName)}
       style={[
         styles.row,
         { backgroundColor: background, borderColor: border },
@@ -146,11 +184,16 @@ export function HabitRow({ habit, day }: { habit: Habit; day: string }) {
       {!quit &&
         done &&
         (proof ? (
-          <Pressable onPress={addProof} hitSlop={8}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={addProof}
+            hitSlop={8}
+            accessibilityLabel="Change proof photo">
             <Image source={{ uri: proofUri(proof) }} style={styles.thumb} contentFit="cover" />
           </Pressable>
         ) : (
           <Pressable
+            accessibilityRole="button"
             onPress={addProof}
             hitSlop={8}
             accessibilityLabel="Add a proof photo"

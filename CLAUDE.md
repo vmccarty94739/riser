@@ -28,7 +28,7 @@ npx expo config --type introspect        # resolved native config (permissions, 
 node scripts/synth-sounds.js assets/sounds   # regenerate all reward/chime WAVs
 ```
 
-Release builds (`eas init/build/submit`) are listed in `README.md`. The store copy, privacy answers and release checklist are in `store/`.
+Release builds (`eas init/build/submit`) are listed in `README.md`. The store copy, privacy answers and release checklist are in `store/`. The privacy policy and support page are `docs/privacy.md` and `docs/index.md`, published by GitHub Pages (main branch, `/docs`) at https://vmccarty94739.github.io/riser/; the app links to them from `src/lib/links.ts`.
 
 ## Environment gotchas
 
@@ -38,7 +38,7 @@ Release builds (`eas init/build/submit`) are listed in `README.md`. The store co
 - Tests live in `src/lib/__tests__/` and import their globals from `@jest/globals`, because the Expo tsconfig doesn't expose jest globals. `helpers.ts` freezes "today" at `2026-09-24` with fake timers. AsyncStorage and `.css` are mapped to mocks in the `jest` block of `package.json`.
 - Xcode and iOS simulators are installed, but CocoaPods isn't (system Ruby 2.6), so there are no local native builds. For visual QA, run `xcrun simctl openurl booted "exp://127.0.0.1:8081/--/<route>"` against the running dev server. Adding `?seed=demo` loads a lived-in demo account (`DevDemoLink`, dev only).
 - `package.json` `overrides` patch two audit findings: `decode-uri-component` points at `vendor/decode-uri-component` (upstream's fixed 0.5.0 is ESM-only, but `query-string@7` in expo-router `require()`s it, so the vendored copy is CommonJS), and `xcode`'s `uuid` is forced to 11.1.x. Drop each once Expo ships the fix; `npm audit` should stay at 0. `expo-local-llm` is pinned exactly; read its diff before bumping.
-- Dev-only code must sit behind `__DEV__` so it is stripped from release bundles: `src/components/dev-tools.tsx` (time travel, challenge shortcuts, XP grants, celebration previews), the demo seed, and `setClockOffset`. In `use-habits.tsx`, the `dev` helpers are `__DEV__ ? {…} : DEV_DISABLED`, so the demo data is dropped from release bundles. Check with `grep -ac "Read to the kids"` on an exported `.hbc` bundle.
+- **Dev-only code is left out of release bundles entirely**, not just hidden: the user must not be able to reach or even find it. All of it lives in `src/components/dev-tools.tsx` (the Settings tools, `useDevActions` for time travel, challenge shortcuts, trophies and XP, the demo data, and `DevDemoLink` for `?seed=demo`). Settings and `_layout.tsx` load it with `const Dev = __DEV__ ? require('@/components/dev-tools') : null`; Metro folds `__DEV__` to false before collecting dependencies, so the module never enters a release bundle. A static `import` of it anywhere would undo that. Time travel goes through `globalThis.__riserClockOffset`, which `clock.ts` only reads behind `__DEV__`. Verify on an exported `.hbc` bundle: `grep -ac` for `Load demo history`, `Read to the kids`, `seed=demo` and `ClockOffset` must all be 0.
 
 ## Product framework
 
@@ -48,7 +48,7 @@ The user designs by five layers; check new work against them: **core function** 
 
 ### Navigation and providers
 - The root `_layout.tsx` wraps everything in `HabitsProvider` → `CloudProvider` → `NavigationTheme` (the expo-router `ThemeProvider`, fed from `useTheme()`) → `RewardsProvider`. Inside it: `AppearanceSync` (applies the light/dark setting via `Appearance.setColorScheme` and the system background), a `Stack` with `Stack.Protected` guards on `onboarded`, `ReminderSync`, `StatusBar`, and `AnimatedSplashOverlay`, which fades out the branded splash.
-- Routes: `onboarding.tsx`, then the `(tabs)` group (`index` Dashboard, `progress` Progress Report, `photos` Camera Roll), plus the modal routes `new-habit`, `new-challenge`, `habit/[id]` (`?edit=1` opens in edit mode) and `settings`. Modals render inside `sheet-screen.tsx`; tab screens inside `screen-scroll.tsx`, which handles the safe area, tab-bar inset, large title and header `action` slot for `SettingsButton`.
+- Routes: `onboarding.tsx`, then the `(tabs)` group (`index` Dashboard, `progress` Progress Report, `photos` Camera Roll), plus the modal routes `new-habit`, `new-challenge`, `habit/[id]` (`?edit=1` opens in edit mode) and `settings`. Modals render inside `sheet-screen.tsx`; tab screens inside `screen-scroll.tsx`, which handles the safe area, tab-bar inset, large title, header `action` slot for `SettingsButton`, and an opaque strip behind the status bar so scrolled content never runs under the clock.
 - Tabs are defined twice: `app-tabs.tsx` (native, `expo-router/unstable-native-tabs`) and `app-tabs.web.tsx`. Update both. The `.web.ts(x)` suffix is Metro's platform-specific resolution.
 
 ### Data
@@ -124,7 +124,7 @@ The user designs by five layers; check new work against them: **core function** 
 - **Claude engine (dormant, deployed):**
   - Flow: `useCoach` → `requestCoach` → `supabase.functions.invoke('coach')` → `supabase/functions/coach/index.ts` (Deno), which reads the user's data through RLS, asks Claude (`generate.ts` setups: daily `claude-haiku-4-5` without thinking, reflections `claude-sonnet-5` at effort medium), and stores the result in `coach_messages`, once per user, kind and period.
   - It needs the `ANTHROPIC_API_KEY` Supabase secret, and the user's opt-in (`settings.coach`, with `coachAsked` for the one-time offer) per App Store guideline 5.1.2(i).
-  - Before switching: run `eval.ts` to choose the cheapest passing daily setup, and restore the Anthropic paragraphs in `store/PRIVACY_POLICY.md`/`STORE_LISTING.md` (see git history).
+  - Before switching: run `eval.ts` to choose the cheapest passing daily setup, and restore the Anthropic paragraphs in `docs/privacy.md`/`store/STORE_LISTING.md` (see git history).
   - Guest (anonymous) users get 403 `account_required`, which the app treats as `off`: guests are free to create, so otherwise a script could spend Claude calls and exhaust the global cap. Decide the guest experience (e.g. prompt to create an account) before switching engines.
   - The global cap is 3,000 messages/24h, and dates more than ±2 days from the server's are rejected.
   - Keep the `ANTHROPIC_API_KEY` secret unset while the engine is `'device'`; without it the function answers 503 and can cost nothing.
@@ -148,6 +148,7 @@ The user designs by five layers; check new work against them: **core function** 
 - **Times** are always picked with `TimeField`/`TimePickerSheet` (hour, minute and AM/PM wheels).
 - **Explanations** sit behind an ⓘ (`InfoButton`), not inline text. Section titles use `SectionHeading`, which is smaller than the page title.
 - **Reanimated + React Compiler:** write shared values in event handlers with `.set()`, not `.value =`, because lint flags the latter.
+- **VoiceOver:** every `Pressable` gets an `accessibilityRole` (`button` unless it's a non-interactive backdrop, which gets `accessible={false}`), icon-only buttons get an `accessibilityLabel`, and choice controls pass `accessibilityState={{ selected }}`. A pressable row that contains other buttons is one VoiceOver element, so those buttons must also be offered as `accessibilityActions` (see `HabitRow`: check in, undo, proof photo, edit or delete).
 - **Haptics** only when `Platform.OS !== 'web'`. Destructive actions confirm with `Alert.alert` on native.
 
 ## Store release
@@ -158,7 +159,7 @@ The user designs by five layers; check new work against them: **core function** 
   - No microphone, background audio, Face ID or media-playback foreground service. `android.blockedPermissions` backs this up.
   - Camera and photo-library permissions carry explanation text.
   - The notification icon and color are set.
-  - `ios.privacyManifests` aggregates the required-reason APIs the bundled libraries declare. It also declares the collected data (email, user ID, user content; linked, not tracking), which must match the App Store privacy answers in `store/STORE_LISTING.md` and `store/PRIVACY_POLICY.md`.
+  - `ios.privacyManifests` aggregates the required-reason APIs the bundled libraries declare. It also declares the collected data (email, user ID, user content; linked, not tracking), which must match the App Store privacy answers in `store/STORE_LISTING.md` and `docs/privacy.md`.
 - `plugins/with-local-notifications-only.js` strips the unused push (`aps-environment`) entitlement. It must stay **first** in the plugin list, because entitlement mods run in reverse order.
 - Verify config changes with `npx expo config --type introspect` or a scratch-copy `npx expo prebuild`.
 - Brand artwork is generated by `scripts/art/make-art.js`, which needs `@resvg/resvg-js` installed outside the project. The iOS icon and the Play feature graphic must have no alpha channel.

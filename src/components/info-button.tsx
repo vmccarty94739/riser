@@ -62,6 +62,8 @@ export function InfoButton({
           animationType="none"
           onRequestClose={() => setAnchor(null)}>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
             style={StyleSheet.absoluteFill}
             onPress={() => setAnchor(null)}
             onLayout={(e) => setModalH(e.nativeEvent.layout.height)}>

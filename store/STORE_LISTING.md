@@ -79,9 +79,9 @@ No analytics, no ads, no third-party tracking. Proof photos stay on the phone an
 - Is data encrypted in transit? **Yes**. Can users request deletion? **Yes** (Settings → Account → Delete account, or email).
 - Supabase processes the data on your behalf, which counts as a service provider, not "sharing".
 
-**Privacy policy URL** (required by both): host `store/PRIVACY_POLICY.md` publicly (GitHub Pages, a Notion public page, Carrd, etc.).
+**Privacy policy URL** (required by both): https://vmccarty94739.github.io/riser/privacy/ (GitHub Pages, built from `docs/privacy.md`; edit that file to change it). Settings → Help & privacy links to it in the app.
 
-**Support URL** (Apple requires one): any public page with a way to contact you.
+**Support URL** (Apple requires one): https://vmccarty94739.github.io/riser/ (built from `docs/index.md`).
 
 **Support / contact email**: `riserapp.support@gmail.com`. It's also the sender of Riser's account emails: Gmail SMTP in Supabase, limited to 500 a day. Move to a domain with a service like Resend if the app outgrows that.
 
@@ -89,10 +89,14 @@ No analytics, no ads, no third-party tracking. Proof photos stay on the phone an
 
 ## 3. Age rating questionnaires
 
-Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and porn. It shows only short labels and icons for these — no depictions, no content.
+Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and adult content. It shows only short labels and icons for these — no depictions, no content.
 
-- **Apple**: answer honestly. "Alcohol, Tobacco, or Drug Use or References" → **Infrequent/Mild**. "Mature or Suggestive Themes" → **Infrequent/Mild** (because of the "Porn" label). No simulated gambling, violence, or user-generated content shared with others. Expect a teen rating.
-  - _Optional:_ renaming the "Porn" label to "Adult content" may lower the rating.
+- **Apple**: answer the questionnaire honestly; the rating follows from the answers.
+  - "Alcohol, Tobacco, or Drug Use or References" → **Infrequent/Mild** (quit-habit labels such as Alcohol, Weed, Drugs, Vaping).
+  - "Mature or Suggestive Themes" → the app shows no sexual or suggestive content, only a neutral "Adult content" quit label (renamed from "Porn"). **None** is a fair answer; **Infrequent/Mild** is the cautious one. Either way the rating stays 13+, because the alcohol and drug references already set it there.
+  - "Health or Wellness Topics" → **Yes** (habit and quitting support, no medical claims). "Medical or Treatment Information" → **No**.
+  - No simulated gambling (the Gambling label is something to *quit*), no violence, no messaging or user-generated content shared with others, no unrestricted web access, no ads.
+  - Expect a **13+** rating.
 - **Google Play (IARC)**: answer "references to" drugs/alcohol/tobacco = yes, no depiction; no gambling, no user interaction/sharing, no location. Expect Teen.
 - Target audience: **13+**, not designed for children.
 
@@ -100,16 +104,38 @@ Riser lets people track quitting alcohol, tobacco/vaping, drugs, gambling and po
 
 ## 4. App Review notes (Apple)
 
+Paste into App Store Connect → App Review Information → Notes:
+
 ```
-Riser works offline and needs no sign-in: data is backed up to an anonymous account automatically.
-An optional email + password account can be created during onboarding (skippable) or in Settings,
-and permanently deleted in Settings → Account → "Delete account" (or Settings → Erase all data).
-Reminders are local notifications. The coach (Progress Report, morning notification) runs entirely on the
-device; no habit data is sent to any AI service.
-Camera and photo access are only requested when the user adds a proof photo to a completed habit.
+Riser is a habit tracker. It works offline and needs no sign-in: after onboarding, data is backed up
+automatically to an anonymous guest account.
+
+ACCOUNTS
+- Creating an account is optional ("Skip for now" in onboarding, or Settings → Account → Create account).
+- Email ownership is verified: the app emails an 8-digit code that must be entered to finish.
+- Accounts are permanently deleted in-app: Settings → Account → "Delete account"
+  (guests: Settings → "Erase all data"). Both confirm first and remove the account and all cloud data.
+
+DEMO ACCOUNT (history already filled in)
+- Email: <demo account email>   Password: <demo password>
+- Settings → Account → "I already have an account" to sign in. Trophies and levels are earned over
+  days of real check-ins, so the demo account shows them already unlocked.
+
+FEATURES TO TRY
+- Tap a habit's ring to check in (sound, haptic, confetti). Long-press a habit to edit or delete it.
+- Progress Report tab: level, Coach's Report, trophy cabinet, charts, calendar and history.
+- After checking in, tap the camera on the habit to attach a proof photo (Camera Roll tab).
+
+PRIVACY AND PERMISSIONS
+- The coach runs entirely on the device (Apple Intelligence where available, otherwise the app's own
+  rules). No habit data is sent to any AI service.
+- Notifications are local only (no push). Permission is asked during onboarding after an explanation
+  screen, and can be skipped with "Maybe later".
+- Camera and photos are only used when the user adds a proof photo; photos never leave the device.
+- No ads, analytics or tracking.
 ```
 
----
+Before submitting, create the demo account on a real phone (sign up with an inbox you control, confirm the code, then add a few weeks of check-ins or load them some other way) and fill in its email and password above. Don't use your personal account.
 
 ## 5. Assets
 

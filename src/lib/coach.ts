@@ -23,7 +23,7 @@ import { supabase } from '@/lib/supabase';
  * - `claude` (later, paid): the `coach` Supabase Edge Function asks Claude (see
  *   supabase/functions/coach). Needs the ANTHROPIC_API_KEY secret, and the user's opt-in
  *   (`settings.coach`) because habit data leaves the phone. Before switching, restore the Anthropic
- *   paragraphs in store/PRIVACY_POLICY.md and store/STORE_LISTING.md (git history).
+ *   paragraphs in docs/privacy.md and store/STORE_LISTING.md (git history).
  *
  * The latest message of each kind is kept on the phone, so it shows instantly; a message is
  * written once per period (day / Monday-week / month).

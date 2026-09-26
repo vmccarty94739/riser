@@ -55,7 +55,7 @@ export default function NewChallengeScreen() {
       title="Custom challenge"
       closeLabel="Cancel"
       action={
-        <Pressable onPress={create} disabled={!habit} hitSlop={12}>
+        <Pressable accessibilityRole="button" onPress={create} disabled={!habit} hitSlop={12}>
           <ThemedText type="smallBold" style={{ color: theme.accent }}>
             Start
           </ThemedText>
@@ -95,6 +95,8 @@ export default function NewChallengeScreen() {
             const selected = h.id === habitId;
             return (
               <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: selected }}
                 key={h.id}
                 onPress={() => setHabitId(h.id)}
                 style={[
@@ -134,6 +136,8 @@ export default function NewChallengeScreen() {
         <ThemedView type="backgroundElement" style={styles.stepper}>
           <ThemedText style={styles.flex}>Or set exactly</ThemedText>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="One day fewer"
             onPress={() => setLength((l) => Math.max(2, l - 1))}
             style={[styles.stepButton, { backgroundColor: theme.background }]}>
             <ThemedText style={[styles.stepText, { color: theme.accent }]}>−</ThemedText>
@@ -142,6 +146,8 @@ export default function NewChallengeScreen() {
             {length}
           </ThemedText>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="One day more"
             onPress={() => setLength((l) => Math.min(365, l + 1))}
             style={[styles.stepButton, { backgroundColor: theme.background }]}>
             <ThemedText style={[styles.stepText, { color: theme.accent }]}>+</ThemedText>
@@ -161,6 +167,7 @@ export default function NewChallengeScreen() {
       </Section>
 
       <Pressable
+        accessibilityRole="button"
         onPress={create}
         disabled={!habit}
         style={[styles.primary, { backgroundColor: theme.gold }, !habit && styles.disabled]}>

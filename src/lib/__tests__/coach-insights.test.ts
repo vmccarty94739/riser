@@ -45,6 +45,8 @@ describe('insightsFor', () => {
     );
     const tip = insightsFor([gym], [], TODAY).find((i) => i.kind === 'weekday');
     expect(tip?.body).toMatch(/missed “Workout” on 4 of the last 4 \w+days/);
+    // The overall rate is spelled out, not a bare count.
+    expect(tip?.body).toMatch(/Across the last \d+ days you’ve done it on \d+ of them/);
   });
 
   it('spots a keystone habit that lifts another', () => {

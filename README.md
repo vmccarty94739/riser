@@ -52,10 +52,12 @@ Without a `.env`, the app runs local-only, with account features hidden.
 1. Create a Supabase project. Put its URL and **publishable** key in `.env`. Never use the secret key in the app.
    Cloud builds don't see `.env` (it's gitignored); put the same two values in the `base` profile's `env` in `eas.json`.
 2. Run every file in `supabase/migrations/`, in filename order, in the dashboard's **SQL Editor**. They create the tables, Row Level Security policies, `updated_at` triggers, size limits and the `delete_account()` function.
-3. Go to **Authentication → Sign In / Providers**. Enable **anonymous sign-ins**, keep **Email** enabled, and turn off **Confirm email**. If you leave confirmation on, the app asks for the emailed code instead.
-4. Go to **Authentication → Emails → Reset Password**. Add `{{ .Token }}` to the template, because the app resets passwords with an emailed code rather than a link.
+3. Go to **Authentication → Sign In / Providers**. Enable **anonymous sign-ins**, keep **Email** enabled, and turn on **Confirm email** and **Secure email change**, so nobody can claim an email address they don't own.
+4. Go to **Authentication → Emails**. The app confirms sign-ups, email changes and password resets with an emailed code, not a link, so the **Confirm signup**, **Change email address** and **Reset Password** templates must all show `{{ .Token }}`.
 5. Go to **Authentication → Providers → Email**. Set the minimum password length to 8 and require letters and digits, matching the app's rule.
 6. Before launch, set up custom SMTP (Authentication → Emails → SMTP). Supabase's built-in sender only delivers to your own team.
+7. Under **Authentication → Rate Limits**, keep email sending modest (the project uses 20 an hour, which keeps Gmail SMTP under its daily cap) and anonymous sign-ins at 15 an hour per IP.
+8. Before launch, move the project to the **Pro** plan: free projects pause after a week of low activity (sign-in and sync then stop until it's restored) and have no backups.
 
 **Coach (Claude version, currently off):**
 - `supabase/functions/coach` is a Deno edge function. It reads the signed-in user's habits through Row Level Security, builds a digest (`stats.ts`), asks Claude for structured output (`prompt.ts`), and stores the result in `coach_messages`: one per user, kind and period, so each message is paid for once.
@@ -76,7 +78,7 @@ Without a `.env`, the app runs local-only, with account features hidden.
 | `npm run lint` | ESLint |
 | `npx expo-doctor` | Dependency and config health |
 
-In development builds only, **Settings** ends with developer tools: time travel, challenge shortcuts, previews of every celebration and demo data. Opening the app with `?seed=demo` in the URL (for example `exp://127.0.0.1:8081/--/?seed=demo`) loads a lived-in demo account.
+In development builds only, **Settings** ends with developer tools: time travel, challenge shortcuts, previews of every celebration and demo data. Opening the app with `?seed=demo` in the URL (for example `exp://127.0.0.1:8081/--/?seed=demo`) loads a lived-in demo account. All of it lives in `src/components/dev-tools.tsx`, which is only `require`d behind `__DEV__`, so release builds contain none of it.
 
 ## Release
 
@@ -100,7 +102,7 @@ Store copy, privacy answers and the pre-submission checklist are in [`store/`](s
 
 ## Privacy
 
-Riser collects no data. There are no servers, analytics, ads or tracking. See [`store/PRIVACY_POLICY.md`](store/PRIVACY_POLICY.md).
+Habits, check-ins, challenges and settings are backed up to the user's own account in Supabase (a guest account until they add an email), protected by Row Level Security. Proof photos, the coach and its name for you stay on the phone. There are no analytics, ads or tracking. See the [privacy policy](docs/privacy.md), published at https://vmccarty94739.github.io/riser/privacy/.
 
 ## License
 

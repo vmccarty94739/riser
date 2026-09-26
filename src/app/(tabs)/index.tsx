@@ -131,6 +131,7 @@ export default function DashboardScreen() {
           </ThemedText>
         )}
         <Pressable
+          accessibilityRole="button"
           onPress={() => router.push({ pathname: '/new-habit', params: { kind } })}
           style={[
             styles.addButton,
@@ -162,7 +163,10 @@ export default function DashboardScreen() {
             />
           }
           trailing={
-            <Pressable onPress={() => router.push('/new-challenge')} hitSlop={8}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/new-challenge')}
+              hitSlop={8}>
               <ThemedText type="small" style={{ color: theme.gold, fontWeight: 700 }}>
                 + Custom
               </ThemedText>
@@ -186,6 +190,7 @@ export default function DashboardScreen() {
             </ThemedText>
           </View>
           <Pressable
+            accessibilityRole="button"
             onPress={() => startChallenge(suggestion.habit.id, suggestion.length)}
             style={[styles.suggestButton, { backgroundColor: theme.gold }]}>
             <ThemedText type="smallBold" themeColor="onGold">
@@ -208,6 +213,7 @@ export default function DashboardScreen() {
       {/* Day navigator: log today or fix past days, never the future. */}
       <View style={styles.dayNav}>
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Previous day"
           onPress={() => move(-1)}
           hitSlop={10}
@@ -240,6 +246,7 @@ export default function DashboardScreen() {
           )}
         </View>
         <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Next day"
           onPress={() => move(1)}
           hitSlop={10}
@@ -254,6 +261,7 @@ export default function DashboardScreen() {
       {!isToday && (
         <Animated.View entering={FadeIn} style={styles.center}>
           <Pressable
+            accessibilityRole="button"
             onPress={() => setOffset(0)}
             style={[styles.returnButton, { backgroundColor: theme.accent }]}>
             <ThemedText type="smallBold" themeColor="onAccent">
@@ -300,6 +308,8 @@ export default function DashboardScreen() {
           const done = list.filter((h) => isDone(h, day)).length;
           return (
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
               key={label}
               onPress={() => goToPage(p)}
               style={[styles.segment, selected && { backgroundColor: theme.background }]}>

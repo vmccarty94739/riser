@@ -280,7 +280,7 @@ export function insightsFor(
         title: `${LONG_DAY[weekday]} are tricky for ${s.name}`,
         body: `You’ve missed ${s.name} on ${m} of the last ${n} ${LONG_DAY[weekday]}, and today is one of them.${
           pct(s.recent) >= 60
-            ? ` Across the last ${s.recent.of} days it’s at ${s.recent.done}, so this isn’t a motivation problem, it’s a ${LONG_DAY[weekday].slice(0, -1)} problem: something about this day’s schedule keeps crowding it out.`
+            ? ` Across the last ${s.recent.of} days you’ve ${s.habit.kind === 'quit' ? 'stayed clean' : 'done it'} on ${s.recent.done} of them, so this isn’t a motivation problem, it’s a ${LONG_DAY[weekday].slice(0, -1)} problem: something about this day’s schedule keeps crowding it out.`
             : ' Knowing the pattern is half the battle.'
         } Decide right now exactly when it happens today.`,
         tip: `${tip} ${smallVersion(s)}`,

@@ -150,12 +150,16 @@ export function ChallengeCard({ challenge, habit }: Entry) {
 
         {lost && habit && (
           <View style={styles.actions}>
-            <Pressable onPress={() => dismissChallenge(challenge.id)} style={styles.action}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => dismissChallenge(challenge.id)}
+              style={styles.action}>
               <ThemedText type="small" themeColor="textSecondary">
                 Dismiss
               </ThemedText>
             </Pressable>
             <Pressable
+              accessibilityRole="button"
               onPress={() =>
                 startChallenge(challenge.habitId, challenge.length, { title: challenge.title })
               }
@@ -194,6 +198,7 @@ function ChallengeStack({ entries }: { entries: Entry[] }) {
           const lost = r.status === 'lost';
           return (
             <Pressable
+              accessibilityRole="button"
               key={r.challenge.id}
               onPress={() => router.push(`/habit/${r.challenge.habitId}`)}
               style={styles.stackRow}>
@@ -215,6 +220,7 @@ function ChallengeStack({ entries }: { entries: Entry[] }) {
               </View>
               {lost && r.habit ? (
                 <Pressable
+                  accessibilityRole="button"
                   onPress={() =>
                     startChallenge(r.challenge.habitId, r.challenge.length, {
                       title: r.challenge.title,

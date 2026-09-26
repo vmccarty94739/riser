@@ -75,6 +75,7 @@ export default function CameraRollScreen() {
                 <View style={styles.grid}>
                   {dayPhotos.map((p) => (
                     <Pressable
+                      accessibilityRole="button"
                       key={`${p.habit.id}-${p.day}`}
                       onPress={() => setViewing(p)}
                       accessibilityLabel={`${p.habit.name}, ${label(p.day)}`}
@@ -138,10 +139,10 @@ function PhotoViewer({ photo, onClose }: { photo: Photo | null; onClose: () => v
           { paddingTop: insets.top + Spacing.two, paddingBottom: insets.bottom + Spacing.three },
         ]}>
         <View style={styles.viewerTop}>
-          <Pressable onPress={onClose} hitSlop={12}>
+          <Pressable accessibilityRole="button" onPress={onClose} hitSlop={12}>
             <ThemedText style={styles.viewerText}>Close</ThemedText>
           </Pressable>
-          <Pressable onPress={remove} hitSlop={12}>
+          <Pressable accessibilityRole="button" onPress={remove} hitSlop={12}>
             <ThemedText style={[styles.viewerText, styles.viewerDelete]}>Delete</ThemedText>
           </Pressable>
         </View>
@@ -168,6 +169,7 @@ function PhotoViewer({ photo, onClose }: { photo: Photo | null; onClose: () => v
             </ThemedText>
           </View>
           <Pressable
+            accessibilityRole="button"
             onPress={() => {
               onClose();
               router.push(`/habit/${photo.habit.id}`);

@@ -10,8 +10,9 @@ import {
   View,
 } from 'react-native';
 
+import Constants from 'expo-constants';
+
 import { AccountCard } from '@/components/account-card';
-import { DevTools } from '@/components/dev-tools';
 import { Section, Segmented } from '@/components/habit-fields';
 import { CoachNameField } from '@/components/coach-name-field';
 import { TimeField } from '@/components/time-picker';
@@ -27,7 +28,15 @@ import { useRewards } from '@/hooks/use-rewards';
 import { useTheme } from '@/hooks/use-theme';
 import { useXp } from '@/hooks/use-xp';
 import { CHIMES } from '@/lib/xp';
+import { PRIVACY_URL, SUPPORT_EMAIL, SUPPORT_URL } from '@/lib/links';
 import { ensurePermission, listScheduled, sendTestReminder } from '@/lib/reminders';
+
+// Developer tools are required only in development; Metro folds `__DEV__` to false before it
+// collects dependencies, so release bundles don't contain them at all.
+const Dev: typeof import('@/components/dev-tools') | null = __DEV__
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- a static import would bundle it
+    require('@/components/dev-tools')
+  : null;
 
 /** A daily reminder: on/off plus its time on the wheel picker. */
 function TimeRow({
@@ -131,6 +140,8 @@ function SwatchPicker({
           const selected = s.id === value;
           return (
             <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: selected }}
               key={s.id}
               disabled={!open}
               onPress={() => onPick(s.id)}
@@ -231,6 +242,10 @@ export default function SettingsScreen() {
     ]);
   };
 
+  // Opens a web page or the mail app; if nothing can handle it, show where to go instead.
+  const open = (url: string, fallback: string) =>
+    Linking.openURL(url).catch(() => Alert.alert('Couldn’t open it', fallback));
+
   return (
     <SheetScreen title="Settings">
       <Section label="ACCOUNT">
@@ -280,6 +295,7 @@ export default function SettingsScreen() {
         />
         {settings.reminders && blocked && (
           <Pressable
+            accessibilityRole="button"
             onPress={() => Linking.openSettings()}
             style={[styles.warning, { backgroundColor: theme.dangerSoft }]}>
             <ThemedText type="smallBold" style={{ color: theme.danger }}>
@@ -324,6 +340,7 @@ export default function SettingsScreen() {
               Each habit can have its own reminder times too. Open a habit and tap Edit.
             </ThemedText>
             <Pressable
+              accessibilityRole="button"
               onPress={async () => {
                 if (await sendTestReminder(habits, challenges, settings)) setTestSent(true);
                 else denied();
@@ -415,6 +432,7 @@ export default function SettingsScreen() {
                 <ThemedText style={[styles.flex, !open && styles.dimmed]}>{c.name}</ThemedText>
                 {open ? (
                   <Pressable
+                    accessibilityRole="button"
                     onPress={() => playChime(c.id)}
                     hitSlop={10}
                     accessibilityLabel={`Preview ${c.name}`}>
@@ -440,10 +458,35 @@ export default function SettingsScreen() {
         )}
       </Section>
 
-      {__DEV__ && <DevTools />}
+      {Dev && <Dev.DevTools />}
+
+      <Section label="HELP & PRIVACY">
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => open(PRIVACY_URL, PRIVACY_URL)}
+          style={styles.linkRow}>
+          <ThemedText>Privacy policy</ThemedText>
+        </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => open(SUPPORT_URL, SUPPORT_URL)}
+          style={styles.linkRow}>
+          <ThemedText>Help & support</ThemedText>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityHint={SUPPORT_EMAIL}
+          onPress={() =>
+            open(`mailto:${SUPPORT_EMAIL}?subject=Riser%20support`, `Email us at ${SUPPORT_EMAIL}`)
+          }
+          style={styles.linkRow}>
+          <ThemedText>Contact support</ThemedText>
+        </Pressable>
+      </Section>
 
       <Section label="APP">
         <Pressable
+          accessibilityRole="button"
           onPress={() =>
             confirm('Replay onboarding?', 'Your habits and history are kept.', 'Replay', () =>
               setOnboarded(false)
@@ -453,6 +496,7 @@ export default function SettingsScreen() {
           <ThemedText>Replay onboarding</ThemedText>
         </Pressable>
         <Pressable
+          accessibilityRole="button"
           onPress={() =>
             confirm(
               'Erase everything?',
@@ -470,6 +514,10 @@ export default function SettingsScreen() {
           <ThemedText style={{ color: theme.danger }}>Erase all data</ThemedText>
         </Pressable>
       </Section>
+
+      <ThemedText type="small" themeColor="textSecondary" style={styles.version}>
+        Riser {Constants.expoConfig?.version ?? ''}
+      </ThemedText>
     </SheetScreen>
   );
 }
@@ -573,5 +621,9 @@ const styles = StyleSheet.create({
   linkRow: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.one,
+  },
+  version: {
+    textAlign: 'center',
+    marginTop: Spacing.two,
   },
 });

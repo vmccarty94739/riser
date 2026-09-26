@@ -113,14 +113,14 @@ export default function HabitScreen() {
       <SheetScreen
         title="Edit habit"
         action={
-          <Pressable onPress={save} disabled={!valid} hitSlop={12}>
+          <Pressable accessibilityRole="button" onPress={save} disabled={!valid} hitSlop={12}>
             <ThemedText type="smallBold" style={{ color: theme.accent, opacity: valid ? 1 : 0.4 }}>
               Save
             </ThemedText>
           </Pressable>
         }>
         <HabitFields value={draft} onChange={setDraft} />
-        <Pressable onPress={() => setDraft(null)} style={styles.link}>
+        <Pressable accessibilityRole="button" onPress={() => setDraft(null)} style={styles.link}>
           <ThemedText type="small" themeColor="textSecondary">
             Discard changes
           </ThemedText>
@@ -135,6 +135,7 @@ export default function HabitScreen() {
       action={
         <View style={styles.headerActions}>
           <Pressable
+            accessibilityRole="button"
             hitSlop={8}
             onPress={() =>
               setDraft({
@@ -151,6 +152,7 @@ export default function HabitScreen() {
             </ThemedText>
           </Pressable>
           <Pressable
+            accessibilityRole="button"
             hitSlop={8}
             onPress={confirmDelete}
             accessibilityLabel="Delete habit"
@@ -232,6 +234,7 @@ export default function HabitScreen() {
             const current = showChallenge && tierFor(challenge.length).days === tier.days;
             return (
               <Pressable
+                accessibilityRole="button"
                 key={tier.days}
                 disabled={!!showChallenge}
                 onPress={() => startChallenge(habit.id, tier.days)}
@@ -266,6 +269,7 @@ export default function HabitScreen() {
           </ThemedText>
         )}
         <Pressable
+          accessibilityRole="button"
           onPress={() => router.push({ pathname: '/new-challenge', params: { habitId: habit.id } })}
           style={[styles.customButton, { borderColor: theme.gold }]}>
           <ThemedText type="small" style={{ color: theme.gold }}>
@@ -282,7 +286,11 @@ export default function HabitScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.photos}>
               {photos.map(([day, file]) => (
-                <Pressable key={day} onPress={() => setViewing(day)} style={styles.photoWrap}>
+                <Pressable
+                  accessibilityRole="button"
+                  key={day}
+                  onPress={() => setViewing(day)}
+                  style={styles.photoWrap}>
                   <Image source={{ uri: proofUri(file) }} style={styles.photo} contentFit="cover" />
                   <ThemedText type="small" themeColor="textSecondary" style={styles.photoDate}>
                     {fmtDay(day, { month: 'short', day: 'numeric' })}
@@ -301,6 +309,7 @@ export default function HabitScreen() {
       )}
 
       <Pressable
+        accessibilityRole="button"
         onPress={confirmDelete}
         style={[styles.deleteButton, { borderColor: theme.danger }]}>
         <ThemedText type="smallBold" style={{ color: theme.danger }}>
@@ -315,7 +324,11 @@ export default function HabitScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => setViewing(null)}>
-        <Pressable style={styles.viewer} onPress={() => setViewing(null)}>
+        <Pressable
+          style={styles.viewer}
+          onPress={() => setViewing(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Close photo">
           {viewing && habit.proofs[viewing] && (
             <>
               <Image
@@ -328,6 +341,7 @@ export default function HabitScreen() {
                 {fmtDay(viewing, { weekday: 'long', month: 'long', day: 'numeric' })}
               </ThemedText>
               <Pressable
+                accessibilityRole="button"
                 onPress={() => {
                   setProof(habit.id, viewing, null);
                   setViewing(null);

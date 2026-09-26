@@ -1,5 +1,4 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
@@ -19,6 +18,12 @@ import { syncReminders } from '@/lib/reminders';
 
 SplashScreen.preventAutoHideAsync();
 
+// Development only (the `?seed=demo` link); left out of release bundles entirely.
+const Dev: typeof import('@/components/dev-tools') | null = __DEV__
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- a static import would bundle it
+    require('@/components/dev-tools')
+  : null;
+
 export default function RootLayout() {
   return (
     <HabitsProvider>
@@ -28,7 +33,7 @@ export default function RootLayout() {
             <AppearanceSync />
             <RootStack />
             <ReminderSync />
-            {__DEV__ && <DevDemoLink />}
+            {Dev && <Dev.DevDemoLink />}
             <StatusBar style="auto" />
           </RewardsProvider>
         </NavigationTheme>
@@ -94,22 +99,6 @@ function AppearanceSync() {
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
   }, [theme.background]);
-  return null;
-}
-
-/**
- * Development only: opening the app with `?seed=demo` in the URL loads the demo account
- * (used for store screenshots). Compiled out of release builds.
- */
-function DevDemoLink() {
-  const { loaded, dev } = useHabits();
-  const url = Linking.useLinkingURL();
-  const seed = dev.seedDemo;
-  useEffect(() => {
-    if (loaded && url?.includes('seed=demo')) seed();
-    // Only react to new URLs, not to the store changes the seed itself causes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, url]);
   return null;
 }
 

@@ -188,6 +188,7 @@ export function SegmentedBars({
           <View style={styles.bars}>
             {bars.map((bar, i) => (
               <Pressable
+                accessibilityRole="button"
                 key={bar.bucket.key}
                 onPress={() => toggle({ bar: i })}
                 accessibilityLabel={`${bar.bucket.detail}: details`}
@@ -326,6 +327,7 @@ export function SegmentedBars({
               </ThemedText>
             </View>
             <Pressable
+              accessibilityRole="button"
               onPress={() => setDetail(null)}
               hitSlop={10}
               accessibilityLabel="Close details">

@@ -77,7 +77,7 @@ export const QUIT_GROUPS: QuitGroup[] = [
     label: 'Digital',
     icon: '📱',
     icons: [
-      q('🔞', 'Porn', 'No porn'),
+      q('🔞', 'Adult content', 'No adult content'),
       q('📱', 'Doomscrolling', 'No doomscrolling'),
       q('💬', 'Social media', 'No social media'),
       q('🎮', 'Gaming', 'No gaming binges'),

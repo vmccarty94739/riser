@@ -29,31 +29,45 @@ export function ScreenScroll({ title, subtitle, action, children }: Props) {
   });
 
   return (
-    <ScrollView
-      style={{ backgroundColor: theme.background }}
-      contentInset={insets}
-      automaticallyAdjustKeyboardInsets
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={[styles.content, contentPlatformStyle]}>
-      <View style={styles.inner}>
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            {subtitle && (
-              <ThemedText type="smallBold" themeColor="textSecondary" style={styles.subtitle}>
-                {subtitle}
-              </ThemedText>
-            )}
-            <ThemedText type="subtitle">{title}</ThemedText>
+    <View style={[styles.screen, { backgroundColor: theme.background }]}>
+      <ScrollView
+        style={{ backgroundColor: theme.background }}
+        contentInset={insets}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, contentPlatformStyle]}>
+        <View style={styles.inner}>
+          <View style={styles.header}>
+            <View style={styles.headerText}>
+              {subtitle && (
+                <ThemedText type="smallBold" themeColor="textSecondary" style={styles.subtitle}>
+                  {subtitle}
+                </ThemedText>
+              )}
+              <ThemedText type="subtitle">{title}</ThemedText>
+            </View>
+            {action}
           </View>
-          {action}
+          {children}
         </View>
-        {children}
-      </View>
-    </ScrollView>
+      </ScrollView>
+      {/* Content scrolls under the status bar; this strip keeps the clock and icons readable. */}
+      <View style={[styles.statusBar, { height: insets.top, backgroundColor: theme.background }]} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  statusBar: {
+    position: 'absolute',
+    pointerEvents: 'none',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
   content: {
     flexDirection: 'row',
     justifyContent: 'center',

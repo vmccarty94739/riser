@@ -110,7 +110,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false,
+          "microphonePermission": "Riser doesn't record audio. The audio library that plays Riser's check-in sounds includes recording features, so iOS requires this description.",
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false
         }
@@ -134,13 +134,14 @@
       [
         "expo-secure-store",
         {
-          "faceIDPermission": false
+          "faceIDPermission": "Riser doesn't use Face ID. The secure storage that keeps you signed in supports it, so iOS requires this description."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "owner": "vmccarty"
   }
 }

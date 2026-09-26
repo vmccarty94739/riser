@@ -257,10 +257,14 @@ export default function OnboardingScreen() {
           <Animated.View entering={FadeIn} style={styles.step}>
             <HabitFields value={draft} onChange={setDraft} autoFocus />
             <View style={styles.row}>
-              <Pressable onPress={() => setDraft(null)} style={styles.secondary}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setDraft(null)}
+                style={styles.secondary}>
                 <ThemedText themeColor="textSecondary">Cancel</ThemedText>
               </Pressable>
               <Pressable
+                accessibilityRole="button"
                 disabled={!draft.name.trim()}
                 onPress={() => {
                   setPicked((list) => [
@@ -283,6 +287,7 @@ export default function OnboardingScreen() {
           </Animated.View>
         ) : (
           <Pressable
+            accessibilityRole="button"
             onPress={() => setDraft(emptyHabit())}
             style={[styles.dashed, { borderColor: theme.accent }]}>
             <ThemedText style={{ color: theme.accent }}>+ Create your own</ThemedText>
@@ -326,6 +331,8 @@ export default function OnboardingScreen() {
                 const selected = c.key === challengeChoice?.key;
                 return (
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: selected }}
                     key={c.key}
                     onPress={() => setChallengeKey(c.key)}
                     style={[
@@ -429,8 +436,9 @@ export default function OnboardingScreen() {
           />
         </ThemedView>
         <ThemedText type="small" themeColor="textSecondary">
-          🔒 Your password is encrypted and never stored on this phone. Skip this and your habits
-          are still backed up to a private guest account.
+          🔒 Your password is sent over an encrypted connection and kept only as a secure one-way
+          hash, never in plain text and never on this phone. Skip this and your habits are still
+          backed up to a private guest account.
         </ThemedText>
       </View>
     ),
@@ -511,6 +519,7 @@ export default function OnboardingScreen() {
       ]}>
       <View style={styles.topBar}>
         <Pressable
+          accessibilityRole="button"
           disabled={index === 0 && !signingIn}
           onPress={() => (signingIn ? setSigningIn(false) : goBack())}
           hitSlop={12}
@@ -560,6 +569,7 @@ export default function OnboardingScreen() {
         ]}>
         {step !== 'account' && (
           <Pressable
+            accessibilityRole="button"
             disabled={!canContinue}
             onPress={onPrimary}
             style={[
@@ -576,21 +586,30 @@ export default function OnboardingScreen() {
           </Pressable>
         )}
         {step === 'welcome' && cloud.configured && !hasAccount && (
-          <Pressable onPress={() => setSigningIn(true)} style={styles.secondary}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setSigningIn(true)}
+            style={styles.secondary}>
             <ThemedText type="small" style={{ color: theme.accent }}>
               I already have an account
             </ThemedText>
           </Pressable>
         )}
         {step === 'account' && (
-          <Pressable onPress={() => goTo('pick')} style={styles.secondary}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => goTo('pick')}
+            style={styles.secondary}>
             <ThemedText type="small" themeColor="textSecondary">
               Skip for now
             </ThemedText>
           </Pressable>
         )}
         {last && Platform.OS !== 'web' && (
-          <Pressable onPress={() => finish(false)} style={styles.secondary}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => finish(false)}
+            style={styles.secondary}>
             <ThemedText type="small" themeColor="textSecondary">
               Maybe later
             </ThemedText>
@@ -629,7 +648,7 @@ function SignInStep({ onEmptyAccount }: { onEmptyAccount: () => void }) {
               : 'This only takes a moment.'}
         </ThemedText>
         {cloud.status === 'synced' && (
-          <Pressable onPress={onEmptyAccount} style={styles.secondary}>
+          <Pressable accessibilityRole="button" onPress={onEmptyAccount} style={styles.secondary}>
             <ThemedText type="smallBold" style={{ color: theme.accent }}>
               Pick my habits
             </ThemedText>
@@ -638,6 +657,7 @@ function SignInStep({ onEmptyAccount }: { onEmptyAccount: () => void }) {
         {failed && (
           <>
             <Pressable
+              accessibilityRole="button"
               onPress={cloud.syncNow}
               style={[styles.primary, styles.full, { backgroundColor: theme.accent }]}>
               <ThemedText type="smallBold" themeColor="onAccent" style={styles.primaryText}>
@@ -645,6 +665,7 @@ function SignInStep({ onEmptyAccount }: { onEmptyAccount: () => void }) {
               </ThemedText>
             </Pressable>
             <Pressable
+              accessibilityRole="button"
               onPress={() => {
                 void cloud.signOut();
                 setDone(false);

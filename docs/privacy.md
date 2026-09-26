@@ -1,6 +1,11 @@
+---
+title: Privacy Policy
+permalink: /privacy/
+---
+
 # Riser Privacy Policy
 
-_Last updated: September 25, 2026_
+_Last updated: September 26, 2026_
 
 Riser is a habit tracker. This policy explains what information the app handles and how. The short version: **your habits are stored on your device and backed up to your private Riser account so you can restore them on a new phone. We don't use analytics or advertising, and we never sell or share your information.**
 
@@ -13,6 +18,7 @@ Riser is a habit tracker. This policy explains what information the app handles 
 | Account password | To protect your account | Never stored as typed. Only a salted, one-way hash is kept by our authentication service |
 | An anonymous account ID | To link your backed-up data to you, even before you add an email | In our authentication service and cloud database |
 | Coach messages (daily nudge, weekly/monthly reports) | To show your coaching | On your device only |
+| The first name you give the coach | To personalise greetings and coaching | On your device only |
 | Proof photos you choose to take or pick | To show your progress in Camera Roll and on each habit | On your device only. Photos are not uploaded |
 
 ## How your data is stored and protected
@@ -59,3 +65,6 @@ If this policy changes, the updated version will be posted at this address with 
 ## Contact
 
 Questions about privacy, or want your data deleted? Email **riserapp.support@gmail.com**.
+
+
+[Help & support](../) · riserapp.support@gmail.com

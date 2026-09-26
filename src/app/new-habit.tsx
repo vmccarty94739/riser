@@ -41,7 +41,7 @@ export default function NewHabitScreen() {
       title={quit ? 'Habit to quit' : 'New habit'}
       closeLabel="Cancel"
       action={
-        <Pressable onPress={save} disabled={!valid} hitSlop={12}>
+        <Pressable accessibilityRole="button" onPress={save} disabled={!valid} hitSlop={12}>
           <ThemedText type="smallBold" style={{ color: theme.accent, opacity: valid ? 1 : 0.4 }}>
             Add
           </ThemedText>
@@ -62,6 +62,7 @@ export default function NewHabitScreen() {
       </ThemedView>
 
       <Pressable
+        accessibilityRole="button"
         onPress={save}
         disabled={!valid}
         style={[

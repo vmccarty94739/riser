@@ -220,6 +220,7 @@ function ChallengeWon({ moment, onClose }: { moment: TrophyMoment | null; onClos
               )}
 
               <Pressable
+                accessibilityRole="button"
                 onPress={onClose}
                 style={[styles.primary, { backgroundColor: theme.accent }]}>
                 <ThemedText type="smallBold" themeColor="onAccent">
@@ -337,6 +338,7 @@ function LevelUp({
                 </View>
               )}
               <Pressable
+                accessibilityRole="button"
                 onPress={onClose}
                 style={[styles.primary, { backgroundColor: theme.accent }]}>
                 <ThemedText type="smallBold" themeColor="onAccent">
@@ -379,6 +381,7 @@ function ChimeUnlock({
       </View>
       <View style={styles.unlockButtons}>
         <Pressable
+          accessibilityRole="button"
           onPress={() => playChime(id)}
           style={[styles.unlockButton, { borderColor: theme.accent }]}>
           <ThemedText type="small" style={{ color: theme.accent }}>
@@ -386,6 +389,7 @@ function ChimeUnlock({
           </ThemedText>
         </Pressable>
         <Pressable
+          accessibilityRole="button"
           onPress={() => {
             updateSettings({ chime: id });
             playChime(id);
@@ -443,6 +447,8 @@ function ColorUnlock({ swatch, onApplied }: { swatch: Swatch; onApplied?: () => 
       </View>
       <View style={styles.unlockButtons}>
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: settings.accent === swatch.id }}
           onPress={() => apply({ accent: swatch.id })}
           style={[
             styles.unlockButton,
@@ -456,6 +462,8 @@ function ColorUnlock({ swatch, onApplied }: { swatch: Swatch; onApplied?: () => 
           </ThemedText>
         </Pressable>
         <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: settings.gold === swatch.id }}
           onPress={() => apply({ gold: swatch.id })}
           style={[
             styles.unlockButton,

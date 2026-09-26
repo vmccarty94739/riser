@@ -70,7 +70,7 @@ export function PasswordField({
       passwordRules={isNew ? PASSWORD_RULES : undefined}
       returnKeyType="go"
       trailing={
-        <Pressable onPress={() => setShow((v) => !v)} hitSlop={10}>
+        <Pressable accessibilityRole="button" onPress={() => setShow((v) => !v)} hitSlop={10}>
           <ThemedText type="small" style={{ color: theme.accent }}>
             {show ? 'Hide' : 'Show'}
           </ThemedText>

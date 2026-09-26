@@ -98,6 +98,7 @@ function HabitShelf({
 
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={() => router.push(`/habit/${habit.id}`)}
       style={[styles.shelf, { backgroundColor: theme.background }]}>
       <View style={styles.shelfTop}>
@@ -217,7 +218,11 @@ function Cabinet({
       )}
 
       {(hidden > 0 || all) && (
-        <Pressable onPress={() => setAll((a) => !a)} style={styles.viewAll} hitSlop={6}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setAll((a) => !a)}
+          style={styles.viewAll}
+          hitSlop={6}>
           <ThemedText type="smallBold" style={{ color: theme.gold }}>
             {all ? 'Show less' : `View all (${hidden} more)`}
           </ThemedText>
@@ -283,6 +288,8 @@ export default function ProgressScreen() {
         const selected = kind === k;
         return (
           <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
             key={k}
             onPress={() => switchKind(k)}
             style={[
@@ -475,6 +482,7 @@ export default function ProgressScreen() {
                     const streak = currentStreak(habit);
                     return (
                       <Pressable
+                        accessibilityRole="button"
                         key={habit.id}
                         onPress={() => router.push(`/habit/${habit.id}`)}
                         style={[
@@ -647,6 +655,7 @@ export default function ProgressScreen() {
                   })}
                   {historyDays < totalDays && (
                     <Pressable
+                      accessibilityRole="button"
                       onPress={() => setHistoryDays((d) => d + 14)}
                       style={[styles.more, { borderColor: theme.backgroundSelected }]}>
                       <ThemedText type="small" style={{ color: theme.accent }}>

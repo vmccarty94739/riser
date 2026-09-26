@@ -65,7 +65,7 @@ export function CoachOptIn({ onDismiss }: { onDismiss?: () => void }) {
         </ThemedText>
       </Pressable>
       {onDismiss && (
-        <Pressable onPress={onDismiss} hitSlop={8} style={styles.center}>
+        <Pressable accessibilityRole="button" onPress={onDismiss} hitSlop={8} style={styles.center}>
           <ThemedText type="small" themeColor="textSecondary">
             Not now
           </ThemedText>
@@ -96,7 +96,7 @@ function Failed({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
           ? 'Your coach is busy right now.'
           : 'Couldn’t reach your coach. Check your connection.'}
       </ThemedText>
-      <Pressable onPress={onRetry} hitSlop={8}>
+      <Pressable accessibilityRole="button" onPress={onRetry} hitSlop={8}>
         <ThemedText type="smallBold" style={{ color: theme.accent }}>
           Try again
         </ThemedText>

@@ -99,6 +99,7 @@ function Wheel({
           const distance = Math.abs(i - active);
           return (
             <Pressable
+              accessibilityRole="button"
               key={label}
               onPress={() => {
                 ref.current?.scrollTo({ y: i * ITEM, animated: true });
@@ -150,18 +151,21 @@ export function TimePickerSheet({
       visible={visible}
       animationType="fade"
       onRequestClose={onCancel}>
-      <Pressable style={styles.backdrop} onPress={onCancel}>
+      <Pressable style={styles.backdrop} onPress={onCancel} accessible={false}>
         <Animated.View entering={SlideInDown.duration(240).easing(Easing.out(Easing.cubic))}>
-          <Pressable>
+          <Pressable accessible={false}>
             <ThemedView
               type="background"
               style={[styles.sheet, { paddingBottom: insets.bottom + Spacing.three }]}>
               <View style={styles.header}>
-                <Pressable onPress={onCancel} hitSlop={10}>
+                <Pressable accessibilityRole="button" onPress={onCancel} hitSlop={10}>
                   <ThemedText themeColor="textSecondary">Cancel</ThemedText>
                 </Pressable>
                 <ThemedText type="smallBold">{title}</ThemedText>
-                <Pressable onPress={() => onDone(fromParts(hour, minute, pm))} hitSlop={10}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => onDone(fromParts(hour, minute, pm))}
+                  hitSlop={10}>
                   <ThemedText type="smallBold" style={{ color: theme.accent }}>
                     Done
                   </ThemedText>
@@ -204,6 +208,7 @@ export function TimeField({
   return (
     <>
       <Pressable
+        accessibilityRole="button"
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={[styles.field, { backgroundColor: theme.accentSoft }, disabled && styles.disabled]}>

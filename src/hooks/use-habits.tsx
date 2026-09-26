@@ -10,15 +10,7 @@ import {
   type SetStateAction,
 } from 'react';
 
-import { clockOffset, setClockOffset } from '@/lib/clock';
-import {
-  addDays,
-  dayKey,
-  type Challenge,
-  type Habit,
-  type NewHabit,
-  type Settings,
-} from '@/lib/habits';
+import { dayKey, type Challenge, type Habit, type NewHabit, type Settings } from '@/lib/habits';
 import { deleteProof } from '@/lib/proofs';
 import { NO_DELETIONS, type Deleted } from '@/lib/sync';
 
@@ -74,8 +66,6 @@ export const EMPTY_STORE: Store = {
 
 type HabitsContextValue = Store & {
   loaded: boolean;
-  /** Simulated days ahead of the real date (developer tools only). */
-  devOffset: number;
   addHabit: (habit: NewHabit) => Habit;
   updateHabit: (id: string, patch: Partial<NewHabit>) => void;
   removeHabit: (id: string) => void;
@@ -93,28 +83,6 @@ type HabitsContextValue = Store & {
   toggleCollapsed: (key: string) => void;
   setOnboarded: (onboarded: boolean) => void;
   setSeenLevel: (level: number) => void;
-  dev: {
-    setOffset: (days: number) => void;
-    /** Rewrites a challenge so `daysDone` days are complete and the next one is today. */
-    setChallengeProgress: (challengeId: string, daysDone: number) => void;
-    loadDemo: () => void;
-    /** Replaces everything with a lived-in demo account (for screenshots and QA). */
-    seedDemo: () => void;
-    /** Adds a completed challenge of this length (unlocks that tier's trophy and color). */
-    grantTrophy: (length: number) => void;
-    /** Adds (or with a negative number, removes) bonus XP to test levels. */
-    addXp: (amount: number) => void;
-  };
-};
-
-const noop = () => {};
-const DEV_DISABLED: HabitsContextValue['dev'] = {
-  setOffset: noop,
-  setChallengeProgress: noop,
-  loadDemo: noop,
-  seedDemo: noop,
-  grantTrophy: noop,
-  addXp: noop,
 };
 
 const HabitsContext = createContext<HabitsContextValue | null>(null);
@@ -186,105 +154,9 @@ async function loadStore(): Promise<Store> {
   return v1 ? { ...EMPTY_STORE, habits: JSON.parse(v1).map(upgradeHabit) } : EMPTY_STORE;
 }
 
-/** 60 days of believable history, including a quit habit and two habits sharing an icon. */
-function demoHabits(): Habit[] {
-  const today = dayKey();
-  const start = addDays(today, -59);
-  const make = (name: string, emoji: string, rate: number, extra: Partial<Habit> = {}): Habit => {
-    const habit: Habit = {
-      id: newId() + name.length,
-      name,
-      emoji,
-      note: '',
-      kind: 'build',
-      createdAt: start,
-      target: 1,
-      reminders: [],
-      log: {},
-      proofs: {},
-      ...extra,
-    };
-    for (let i = 1; i < 60; i++) {
-      const day = addDays(start, i - 1);
-      // Ramp up over time so the charts show a trend.
-      if (Math.random() < rate * (0.6 + (0.4 * i) / 60)) habit.log[day] = habit.target;
-      else if (habit.target > 1 && Math.random() < 0.6)
-        habit.log[day] = Math.ceil(habit.target / 2);
-    }
-    return habit;
-  };
-  return [
-    make('Drink a glass of water', '💧', 0.8, {
-      target: 4,
-      reminders: ['09:00', '12:00', '15:00', '18:00'],
-    }),
-    make('Read 10 pages', '📚', 0.7, { note: 'Currently: Atomic Habits' }),
-    make('Read to the kids', '📚', 0.6),
-    make('Go for a walk', '🚶', 0.65),
-    make('Meditate 5 minutes', '🧘', 0.5),
-    make('No nicotine', '🚬', 0.85, { kind: 'quit', note: 'For my lungs and my wallet' }),
-    make('No doomscrolling', '📱', 0.55, { kind: 'quit' }),
-  ];
-}
-
-/**
- * A lived-in account for screenshots and QA: two months of history, a perfect-day streak,
- * earned trophies, running challenges and today half done. Deterministic for the last 10 days.
- */
-function demoStore(): Store {
-  const today = dayKey();
-  const habits = demoHabits();
-  const [water, read, readKids, walk, meditate, nicotine, scroll] = habits;
-  // Last 6 days all done (a perfect streak); today partly done.
-  for (let i = 1; i <= 6; i++) habits.forEach((h) => (h.log[addDays(today, -i)] = h.target));
-  water.log[today] = 2;
-  read.log[today] = 1;
-  walk.log[today] = 1;
-  scroll.log[today] = 1;
-  delete readKids.log[today];
-  delete meditate.log[today];
-  delete nicotine.log[today];
-  for (let i = 7; i <= 23; i++) water.log[addDays(today, -i)] = water.target;
-  for (let i = 7; i <= 10; i++) nicotine.log[addDays(today, -i)] = 1;
-  const won = (h: Habit, length: number, endAgo: number): Challenge => ({
-    id: newId() + length + h.name.length,
-    habitId: h.id,
-    habitName: h.name,
-    habitEmoji: h.emoji,
-    habitKind: h.kind,
-    custom: false,
-    title: null,
-    length,
-    startDate: addDays(today, -endAgo - length + 1),
-    completedAt: addDays(today, -endAgo),
-    dismissed: false,
-  });
-  const running = (h: Habit, length: number, startAgo: number): Challenge => ({
-    ...won(h, length, 0),
-    id: newId() + 'r' + length + h.name.length,
-    startDate: addDays(today, -startAgo),
-    completedAt: null,
-  });
-  return {
-    ...EMPTY_STORE,
-    onboarded: true,
-    habits,
-    challenges: [
-      won(water, 3, 20),
-      won(water, 7, 13),
-      won(read, 3, 1),
-      won(nicotine, 3, 8),
-      running(water, 14, 6),
-      running(read, 7, 0),
-      running(nicotine, 7, 6),
-    ],
-  };
-}
-
 export function HabitsProvider({ children }: PropsWithChildren) {
   const [store, setStore] = useState<Store>(EMPTY_STORE);
   const [loaded, setLoaded] = useState(false);
-  const [devOffset, setDevOffset] = useState(clockOffset());
 
   useEffect(() => {
     loadStore()
@@ -343,7 +215,6 @@ export function HabitsProvider({ children }: PropsWithChildren) {
   const value: HabitsContextValue = {
     ...store,
     loaded,
-    devOffset,
     addHabit: (input) => {
       const habit: Habit = {
         ...input,
@@ -430,66 +301,6 @@ export function HabitsProvider({ children }: PropsWithChildren) {
       }),
     setOnboarded: (onboarded) => update((s) => ({ ...s, onboarded })),
     setSeenLevel: (seenLevel) => update((s) => ({ ...s, seenLevel })),
-    // Developer tools only: in release builds these are no-ops, so the demo data and time-travel
-    // helpers are dropped from the bundle.
-    dev: __DEV__
-      ? {
-          setOffset: (days) => {
-            setClockOffset(days);
-            setDevOffset(days);
-          },
-          setChallengeProgress: (challengeId, daysDone) =>
-            update((s) => {
-              const challenge = s.challenges.find((c) => c.id === challengeId);
-              if (!challenge) return s;
-              const today = dayKey();
-              const startDate = addDays(today, -daysDone);
-              return {
-                ...s,
-                challenges: s.challenges.map((c) =>
-                  c.id === challengeId ? { ...c, startDate } : c
-                ),
-                habits: s.habits.map((h) => {
-                  if (h.id !== challenge.habitId) return h;
-                  const log = { ...h.log };
-                  for (let i = 0; i < challenge.length; i++) {
-                    const day = addDays(startDate, i);
-                    if (i < daysDone) log[day] = h.target;
-                    else delete log[day];
-                  }
-                  return {
-                    ...h,
-                    createdAt: h.createdAt < startDate ? h.createdAt : startDate,
-                    log,
-                  };
-                }),
-              };
-            }),
-          loadDemo: () => update((s) => ({ ...s, habits: [...s.habits, ...demoHabits()] })),
-          seedDemo: () => setStore(demoStore()),
-          addXp: (amount) => update((s) => ({ ...s, bonusXp: Math.max(0, s.bonusXp + amount) })),
-          grantTrophy: (length) =>
-            update((s) => {
-              const habit = s.habits[0];
-              if (!habit) return s;
-              const today = dayKey();
-              const challenge: Challenge = {
-                id: newId(),
-                habitId: habit.id,
-                habitName: habit.name,
-                habitEmoji: habit.emoji,
-                habitKind: habit.kind,
-                custom: false,
-                title: null,
-                length,
-                startDate: addDays(today, -length),
-                completedAt: today,
-                dismissed: false,
-              };
-              return { ...s, challenges: [...s.challenges, challenge] };
-            }),
-        }
-      : DEV_DISABLED,
   };
 
   return (
