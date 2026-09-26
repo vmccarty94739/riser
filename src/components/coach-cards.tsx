@@ -10,11 +10,35 @@ import { useCloud } from '@/hooks/use-cloud';
 import { useCoach } from '@/hooks/use-coach';
 import { fmtDay, useHabits } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
-import type { CoachMessage } from '@/lib/coach';
+import { COACH_ENGINE, type CoachMessage } from '@/lib/coach';
+import { DEVICE_MODEL_NAME } from '@/lib/coach-device';
 
-/** Shown in ⓘ and the opt-in: what the coach does and what it sends. */
-export const COACH_ABOUT =
-  'Your coach reads your streaks and check-ins and writes you a personal nudge each day, plus a weekly and monthly report. It’s written by AI (Anthropic’s Claude). To do that, your habit names and check-in history are sent to Anthropic. Nothing else is shared, and you can turn the coach off anytime in Settings.';
+const onDevice = COACH_ENGINE === 'device';
+
+/** Shown in ⓘ (and the Claude opt-in): what the coach does and where the data goes. */
+export const COACH_ABOUT = onDevice
+  ? `Your coach reads your streaks and check-ins and writes you a nudge each day, plus a weekly and monthly report. On phones with ${DEVICE_MODEL_NAME}, the AI built into your phone writes it; otherwise it’s put together from your numbers. Everything stays on your phone. You can turn the coach off in Settings.`
+  : 'Your coach reads your streaks and check-ins and writes you a personal nudge each day, plus a weekly and monthly report. It’s written by AI (Anthropic’s Claude). To do that, your habit names and check-in history are sent to Anthropic. Nothing else is shared, and you can turn the coach off anytime in Settings.';
+
+/** Who wrote a message, in a few words. */
+function Byline({ message }: { message: CoachMessage }) {
+  if (message.source === 'rules') return null;
+  return (
+    <ThemedText type="small" themeColor="textSecondary" style={styles.byline}>
+      {message.source === 'claude'
+        ? '✨ Written by Claude'
+        : `✨ Written privately on your phone by ${DEVICE_MODEL_NAME}`}
+    </ThemedText>
+  );
+}
+
+/** Whether the coach shows at all (on-device it only needs to be switched on). */
+function useCoachVisible() {
+  const cloud = useCloud();
+  const { settings, habits } = useHabits();
+  if (!habits.length) return false;
+  return onDevice ? !settings.coachOff : cloud.configured;
+}
 
 /** Asks before any habit data goes to the AI coach (App Store rule for third-party AI). */
 export function CoachOptIn({ onDismiss }: { onDismiss?: () => void }) {
@@ -83,16 +107,25 @@ function Failed({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
 /** Dashboard: today's nudge, or the one-time offer to turn the coach on. */
 export function CoachNudge({ today }: { today: string }) {
   const theme = useTheme();
-  const cloud = useCloud();
-  const { settings, updateSettings, habits } = useHabits();
+  const { settings, updateSettings } = useHabits();
+  const visible = useCoachVisible();
   const { state, message, retry } = useCoach('daily', today);
 
-  if (!cloud.configured || !habits.length) return null;
-  if (!settings.coach)
+  if (!visible) return null;
+  if (!onDevice && !settings.coach)
     return settings.coachAsked ? null : (
       <CoachOptIn onDismiss={() => updateSettings({ coachAsked: true })} />
     );
-  if (state === 'loading') return <Pending text="Your coach is reading your last two weeks…" />;
+  if (state === 'loading')
+    return (
+      <Pending
+        text={
+          onDevice
+            ? 'Your coach is looking at your last two weeks…'
+            : 'Your coach is reading your last two weeks…'
+        }
+      />
+    );
   if (state === 'failed' || state === 'busy')
     return <Failed busy={state === 'busy'} onRetry={retry} />;
   if (state !== 'ready' || !message) return null;
@@ -114,6 +147,7 @@ export function CoachNudge({ today }: { today: string }) {
             </ThemedText>
           </ThemedView>
         )}
+        <Byline message={message} />
       </ThemedView>
     </Animated.View>
   );
@@ -156,6 +190,7 @@ function Report({ message, kind }: { message: CoachMessage; kind: 'weekly' | 'mo
             </ThemedText>
           </ThemedView>
         )}
+        <Byline message={message} />
       </ThemedView>
     </Animated.View>
   );
@@ -163,13 +198,13 @@ function Report({ message, kind }: { message: CoachMessage; kind: 'weekly' | 'mo
 
 /** Progress Report: the AI weekly / monthly reflection. */
 export function CoachReport({ today }: { today: string }) {
-  const cloud = useCloud();
-  const { settings, habits } = useHabits();
+  const { settings } = useHabits();
+  const visible = useCoachVisible();
   const [kind, setKind] = useState<'weekly' | 'monthly'>('weekly');
   const { state, message, retry } = useCoach(kind, today);
 
-  if (!cloud.configured || !habits.length || state === 'off') return null;
-  if (!settings.coach) return <CoachOptIn />;
+  if (!visible || state === 'off') return null;
+  if (!onDevice && !settings.coach) return <CoachOptIn />;
 
   return (
     <View style={styles.report}>
@@ -236,6 +271,9 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: Spacing.two + 2,
     gap: Spacing.two,
+  },
+  byline: {
+    fontSize: 12,
   },
   highlightIcon: {
     fontSize: 16,

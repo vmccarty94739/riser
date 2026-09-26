@@ -43,6 +43,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { iconText } from '@/lib/icons';
 import { COACH_ABOUT, CoachReport } from '@/components/coach-cards';
+import { COACH_ENGINE } from '@/lib/coach';
 import { useCloud } from '@/hooks/use-cloud';
 import { habitCountOn, tierXp, wonXp } from '@/lib/xp';
 
@@ -248,7 +249,7 @@ function TrophyLine({ challenge, habits }: { challenge: Challenge; habits: Habit
 
 export default function ProgressScreen() {
   const theme = useTheme();
-  const { habits, challenges } = useHabits();
+  const { habits, challenges, settings } = useHabits();
   const [kind, setKind] = useState<HabitKind>('build');
   const [range, setRange] = useState<Range>(7);
   const [historyDays, setHistoryDays] = useState(7);
@@ -329,7 +330,7 @@ export default function ProgressScreen() {
         </ThemedView>
       )}
 
-      {cloud.configured && habits.length > 0 && (
+      {habits.length > 0 && (COACH_ENGINE === 'device' ? !settings.coachOff : cloud.configured) && (
         <>
           <SectionHeading
             title="Coach's Report"

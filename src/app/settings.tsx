@@ -19,6 +19,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { readableText, Spacing, THEME_SWATCHES } from '@/constants/theme';
 import { useCloud } from '@/hooks/use-cloud';
+import { COACH_ENGINE } from '@/lib/coach';
 import { useHabits } from '@/hooks/use-habits';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRewards } from '@/hooks/use-rewards';
@@ -203,15 +204,26 @@ export default function SettingsScreen() {
         <AccountCard />
       </Section>
 
-      {cloud.configured && (
-        <Section label="AI COACH">
+      {COACH_ENGINE === 'device' ? (
+        <Section label="COACH">
           <Row
-            title="AI coach"
-            detail="A daily nudge plus weekly and monthly reports. Sends your habit names and check-ins to Anthropic’s Claude."
-            value={settings.coach}
-            onChange={(coach) => updateSettings({ coach, coachAsked: true })}
+            title="Coach"
+            detail="A daily nudge plus weekly and monthly reports, written on your phone. Nothing leaves your device."
+            value={!settings.coachOff}
+            onChange={(on) => updateSettings({ coachOff: !on })}
           />
         </Section>
+      ) : (
+        cloud.configured && (
+          <Section label="AI COACH">
+            <Row
+              title="AI coach"
+              detail="A daily nudge plus weekly and monthly reports. Sends your habit names and check-ins to Anthropic’s Claude."
+              value={settings.coach}
+              onChange={(coach) => updateSettings({ coach, coachAsked: true })}
+            />
+          </Section>
+        )
       )}
 
       <Section label="CHECK-INS">

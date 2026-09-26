@@ -1,7 +1,8 @@
 import type Anthropic from 'npm:@anthropic-ai/sdk@0.128.0';
 import { zodOutputFormat } from 'npm:@anthropic-ai/sdk@0.128.0/helpers/zod';
 
-import { DailySchema, instructions, ReflectionSchema, SYSTEM } from './prompt.ts';
+import { DailySchema, ReflectionSchema } from './prompt.ts';
+import { instructions, SYSTEM } from './prompt-text.ts';
 import type { Kind } from './stats.ts';
 
 /** Which model writes a message, and how much it thinks first. */

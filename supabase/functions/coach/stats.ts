@@ -158,6 +158,35 @@ function perfectStreak(all: HabitFacts[], today: string) {
   return n;
 }
 
+/** Structured facts about one habit, for code that writes messages without a model. */
+export type HabitSummary = {
+  name: string;
+  emoji: string;
+  kind: 'build' | 'quit';
+  target: number;
+  /** Complete days in the window (today excluded for the daily nudge). */
+  done: number;
+  tracked: number;
+  /** The same-length window before, or null if the habit didn't exist yet. */
+  previous: { done: number; tracked: number } | null;
+  streak: number;
+  best: number;
+  todayCount: number;
+  doneToday: boolean;
+  /** Weekdays it's usually missed on ('Tue', …). */
+  weak: string[];
+};
+
+export type Digest = {
+  text: string;
+  range: { start: string; end: string };
+  habits: HabitSummary[];
+  perfectDays: number;
+  perfectStreak: number;
+  challenges: { name: string; title: string | null; day: number; length: number }[];
+  trophies: { name: string; length: number }[];
+};
+
 /**
  * A plain-text digest of the user's data for one message: the only facts the coach may use.
  * `history` checkins should reach back far enough for streaks (the caller fetches ~120 days).
@@ -168,8 +197,9 @@ export function buildDigest(input: {
   habits: HabitRow[];
   checkins: CheckinRow[];
   challenges: ChallengeRow[];
-}) {
+}): Digest {
   const { kind, today, habits, checkins, challenges } = input;
+  const summaries: HabitSummary[] = [];
   const range = coverage(kind, today);
   const days = daysFrom(range.start, range.end);
   const span = days.length;
@@ -234,17 +264,34 @@ export function buildDigest(input: {
     const weak = weakDays(f, complete);
     if (weak.length) lines.push(`  Usually missed on: ${weak.join(', ')}.`);
     lines.push('');
+    summaries.push({
+      name: h.name,
+      emoji: icon(h.emoji),
+      kind: h.kind,
+      target: h.target,
+      done: now.done,
+      tracked: now.tracked,
+      previous: before.tracked ? { done: before.done, tracked: before.tracked } : null,
+      streak: currentStreak(f, today),
+      best: bestStreak(f, historyStart, today),
+      todayCount: f.counts.get(today) ?? 0,
+      doneToday: f.isDone(today),
+      weak,
+    });
   }
 
   const perfect = perfectDays(facts, complete).length;
+  const perfectRun = perfectStreak(facts, today);
   lines.push(
-    `Perfect days (every habit done) in this window: ${perfect}. Current perfect-day streak: ${perfectStreak(facts, today)}.`
+    `Perfect days (every habit done) in this window: ${perfect}. Current perfect-day streak: ${perfectRun}.`
   );
+  const activeChallenges: Digest['challenges'] = [];
 
   const running = challenges.filter((c) => !c.completed_at && !c.dismissed && c.start_date <= today);
   for (const c of running) {
     const dayN = Math.floor((ms(today) - ms(c.start_date)) / DAY_MS) + 1;
     if (dayN > c.length) continue;
+    activeChallenges.push({ name: c.habit_name, title: c.custom ? c.title : null, day: dayN, length: c.length });
     lines.push(
       `Active challenge: ${c.custom && c.title ? `"${c.title}" — ` : ''}${c.habit_name}, day ${dayN} of ${c.length}.`
     );
@@ -255,5 +302,13 @@ export function buildDigest(input: {
   for (const c of won)
     lines.push(`Trophy earned in this window: ${c.length}-day challenge for ${c.habit_name}.`);
 
-  return { text: lines.join('\n'), range };
+  return {
+    text: lines.join('\n'),
+    range,
+    habits: summaries,
+    perfectDays: perfect,
+    perfectStreak: perfectRun,
+    challenges: activeChallenges,
+    trophies: won.map((c) => ({ name: c.habit_name, length: c.length })),
+  };
 }

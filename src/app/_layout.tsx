@@ -12,7 +12,7 @@ import { CloudProvider, useCloud } from '@/hooks/use-cloud';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { RewardsProvider } from '@/hooks/use-rewards';
 import { useTheme } from '@/hooks/use-theme';
-import { coachMessage, subscribeCoach } from '@/lib/coach';
+import { COACH_ENGINE, coachMessage, subscribeCoach } from '@/lib/coach';
 import { syncReminders } from '@/lib/reminders';
 
 SplashScreen.preventAutoHideAsync();
@@ -116,10 +116,9 @@ function ReminderSync() {
   const { loaded, habits, challenges, settings } = useHabits();
   const cloud = useCloud();
   const daily = useSyncExternalStore(subscribeCoach, () => coachMessage('daily', cloud.user?.id));
+  const coachOn = COACH_ENGINE === 'device' ? !settings.coachOff : settings.coach;
   const coach =
-    settings.coach && daily
-      ? { day: daily.period_start, title: daily.title, body: daily.body }
-      : null;
+    coachOn && daily ? { day: daily.period_start, title: daily.title, body: daily.body } : null;
   const coachKey = coach ? `${coach.day}|${coach.title}` : '';
   // Bumped when the app returns to the foreground, so "today" and streaks are re-evaluated.
   const [foregrounds, setForegrounds] = useState(0);

@@ -1,15 +1,34 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 
-import { addDays, parseDay } from '@/lib/habits';
+import {
+  addDays as addDigestDays,
+  buildDigest,
+  periodStart,
+  type ChallengeRow,
+  type CheckinRow,
+  type HabitRow,
+} from '../../supabase/functions/coach/stats';
+import { writeOnDevice } from '@/lib/coach-device';
+import { dailyByRules, reflectionByRules } from '@/lib/coach-rules';
+import { parseDay, type Challenge, type Habit } from '@/lib/habits';
 import { supabase } from '@/lib/supabase';
 
 /**
- * AI coach client. The `coach` Supabase Edge Function (supabase/functions/coach) reads the user's
- * synced habits, asks Claude for a daily nudge or a weekly/monthly reflection, and stores it; this
- * module requests those messages and keeps the latest of each on the phone, so they show instantly
- * and offline. A message is generated once per period, so re-asking is free.
+ * AI coach client: a daily nudge and weekly/monthly reflections from the user's habit data.
+ *
+ * `COACH_ENGINE` picks who writes them:
+ * - `device` (now, free): the phone's own model (Apple Intelligence / Gemini Nano) when available,
+ *   otherwise the rule-based coach. Everything stays on the phone; no account or network needed.
+ * - `claude` (later, paid): the `coach` Supabase Edge Function asks Claude (see
+ *   supabase/functions/coach). Needs the ANTHROPIC_API_KEY secret, and the user's opt-in
+ *   (`settings.coach`) because habit data leaves the phone. Before switching, restore the Anthropic
+ *   paragraphs in store/PRIVACY_POLICY.md and store/STORE_LISTING.md (git history).
+ *
+ * The latest message of each kind is kept on the phone, so it shows instantly; a message is
+ * written once per period (day / Monday-week / month).
  */
+export const COACH_ENGINE: 'device' | 'claude' = 'device';
 
 export type CoachKind = 'daily' | 'weekly' | 'monthly';
 
@@ -25,23 +44,27 @@ export type CoachMessage = {
   tip: string | null;
   highlights: { emoji: string; text: string }[];
   created_at: string;
+  /** Who wrote it: the phone's model, the rule-based coach, or Claude. */
+  source?: 'device' | 'rules' | 'claude';
 };
 
-/** `off`: the coach isn't set up on the server (no Claude key) — hide it rather than error. */
+/** `off`: the Claude coach isn't set up on the server (no key) — hide it rather than error. */
 export type CoachResult =
   { ok: true; message: CoachMessage | null } | { ok: false; reason: 'off' | 'busy' | 'failed' };
 
+/** The app data the on-device coach reads. */
+export type CoachData = { habits: Habit[]; challenges: Challenge[] };
+
 const KEY = 'riser.coach.v1';
+/** Owner of on-device messages (they come from this phone's data, not an account). */
+const LOCAL = 'local';
 
 /** Mirrors the edge function's `periodStart`: the day, the week's Monday, or the month's 1st. */
 export function coachPeriod(kind: CoachKind, today: string) {
-  if (kind === 'daily') return today;
-  if (kind === 'monthly') return `${today.slice(0, 8)}01`;
-  const dow = parseDay(today).getDay(); // 0 = Sunday
-  return addDays(today, -((dow + 6) % 7));
+  return periodStart(kind, today);
 }
 
-// The latest message of each kind for the signed-in user, persisted and shared with subscribers.
+// The latest message of each kind, persisted and shared with subscribers.
 type Cache = { userId: string | null; messages: Partial<Record<CoachKind, CoachMessage>> };
 let cache: Cache = { userId: null, messages: {} };
 let loading: Promise<void> | null = null;
@@ -51,6 +74,11 @@ function publish(next: Cache) {
   cache = next;
   AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
   listeners.forEach((fn) => fn());
+}
+
+function save(owner: string, message: CoachMessage) {
+  const base = cache.userId === owner ? cache.messages : {};
+  publish({ userId: owner, messages: { ...base, [message.kind]: message } });
 }
 
 export function loadCoachCache() {
@@ -68,9 +96,10 @@ export function subscribeCoach(fn: () => void) {
   return () => listeners.delete(fn);
 }
 
-/** The stored message of a kind, only if it belongs to this user. */
+/** The stored message of a kind for this user (or this phone, for the on-device coach). */
 export function coachMessage(kind: CoachKind, userId: string | null | undefined) {
-  return userId && cache.userId === userId ? (cache.messages[kind] ?? null) : null;
+  const owner = COACH_ENGINE === 'device' ? LOCAL : userId;
+  return owner && cache.userId === owner ? (cache.messages[kind] ?? null) : null;
 }
 
 export function clearCoachCache() {
@@ -79,17 +108,77 @@ export function clearCoachCache() {
 
 const inflight = new Map<string, Promise<CoachResult>>();
 
-/** Asks the coach for this period's message (generated on first ask, then served from storage). */
-export function requestCoach(kind: CoachKind, today: string, userId: string) {
-  const key = `${userId}|${kind}|${coachPeriod(kind, today)}`;
+/** This period's message: written on first ask, then served from storage. */
+export function requestCoach(
+  kind: CoachKind,
+  today: string,
+  userId: string | null,
+  data: CoachData
+) {
+  const owner = COACH_ENGINE === 'device' ? LOCAL : userId;
+  if (!owner) return Promise.resolve<CoachResult>({ ok: false, reason: 'off' });
+  const key = `${owner}|${kind}|${coachPeriod(kind, today)}`;
   const running = inflight.get(key);
   if (running) return running;
-  const run = ask(kind, today, userId).finally(() => inflight.delete(key));
+  const run = (
+    COACH_ENGINE === 'device' ? writeLocally(kind, today, data) : askClaude(kind, today, owner)
+  ).finally(() => inflight.delete(key));
   inflight.set(key, run);
   return run;
 }
 
-async function ask(kind: CoachKind, today: string, userId: string): Promise<CoachResult> {
+/** The app's habits in the shape the digest reads (the same one the database uses). */
+function toRows(today: string, { habits, challenges }: CoachData) {
+  const from = addDigestDays(today, -130);
+  const habitRows: HabitRow[] = habits.map((h) => ({
+    id: h.id,
+    name: h.name,
+    emoji: h.emoji,
+    kind: h.kind,
+    target: h.target,
+    created_on: h.createdAt,
+  }));
+  const checkins: CheckinRow[] = habits.flatMap((h) =>
+    Object.entries(h.log)
+      .filter(([day, count]) => count > 0 && day >= from && day <= today)
+      .map(([day, count]) => ({ habit_id: h.id, day, count }))
+  );
+  const challengeRows: ChallengeRow[] = challenges.map((c) => ({
+    habit_id: c.habitId,
+    habit_name: c.habitName,
+    custom: c.custom,
+    title: c.title,
+    length: c.length,
+    start_date: c.startDate,
+    completed_at: c.completedAt,
+    dismissed: c.dismissed,
+  }));
+  return { habits: habitRows, checkins, challenges: challengeRows };
+}
+
+async function writeLocally(kind: CoachKind, today: string, data: CoachData): Promise<CoachResult> {
+  if (!data.habits.length) return { ok: true, message: null };
+  const digest = buildDigest({ kind, today, ...toRows(today, data) });
+  const device = await writeOnDevice(kind, digest);
+  const written =
+    device ??
+    (kind === 'daily'
+      ? dailyByRules(digest, parseDay(today).getDay())
+      : reflectionByRules(digest, kind === 'weekly' ? 'week' : 'month'));
+  const message: CoachMessage = {
+    kind,
+    period_start: coachPeriod(kind, today),
+    range_start: digest.range.start,
+    range_end: digest.range.end,
+    ...written,
+    created_at: new Date().toISOString(),
+    source: device ? 'device' : 'rules',
+  };
+  save(LOCAL, message);
+  return { ok: true, message };
+}
+
+async function askClaude(kind: CoachKind, today: string, userId: string): Promise<CoachResult> {
   const db = supabase();
   if (!db) return { ok: false, reason: 'off' };
   const { data, error } = await db.functions.invoke<{ message: CoachMessage | null }>('coach', {
@@ -99,10 +188,7 @@ async function ask(kind: CoachKind, today: string, userId: string): Promise<Coac
     const status = error instanceof FunctionsHttpError ? error.context.status : 0;
     return { ok: false, reason: status === 503 ? 'off' : status === 429 ? 'busy' : 'failed' };
   }
-  const message = data?.message ?? null;
-  if (message) {
-    const base = cache.userId === userId ? cache.messages : {};
-    publish({ userId, messages: { ...base, [kind]: message } });
-  }
+  const message = data?.message ? { ...data.message, source: 'claude' as const } : null;
+  if (message) save(userId, message);
   return { ok: true, message };
 }

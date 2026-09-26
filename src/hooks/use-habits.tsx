@@ -56,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   collapsed: [],
   coach: false,
   coachAsked: false,
+  coachOff: false,
 };
 
 export const EMPTY_STORE: Store = {

@@ -12,7 +12,7 @@ Riser is a habit tracker for iOS and Android, built with Expo (React Native) and
 - **XP and levels.** Each level unlocks new app colors and chimes. XP is shared across your habits, so adding more habits doesn't speed up leveling.
 - **Progress Report.** Includes a trend graph by category, a 16-week calendar heatmap, a report card for every habit, your perfect-day streak and full history.
 - **Camera Roll.** Holds the proof photos attached to completed habits, sorted by date.
-- **AI coach (opt-in).** Each morning it writes a personal nudge from your real streaks. It also writes weekly and monthly reflection reports. Written by Claude through a Supabase Edge Function: Haiku 4.5 for the daily nudge, Sonnet 5 for reports.
+- **Coach.** A daily nudge plus weekly and monthly reports built from your real streaks. They're written on the phone by its built-in AI (Apple Intelligence or Gemini Nano) where available, or by the app's rule-based coach otherwise. Nothing leaves the device. A Claude-powered version is built and deployed but switched off (`COACH_ENGINE` in `src/lib/coach.ts`).
 - **Reminders.** A morning intention, reminders at times you choose, and an evening nudge only when something is still open. All are local notifications.
 - **Cloud backup and accounts.** Riser backs up to a guest account from the first day, with no sign-up. Add an email and password to sign in on another phone. Includes password reset and in-app account deletion.
 - **Light and dark mode**, with text that stays readable on every unlockable color.
@@ -55,7 +55,7 @@ Without a `.env`, the app runs local-only, with account features hidden.
 4. Go to **Authentication → Emails → Reset Password**. Add `{{ .Token }}` to the template, because the app resets passwords with an emailed code rather than a link.
 5. Before launch, set up custom SMTP (Authentication → Emails → SMTP). Supabase's built-in sender only delivers to your own team.
 
-**AI coach:**
+**Coach (Claude version, currently off):**
 - `supabase/functions/coach` is a Deno edge function. It reads the signed-in user's habits through Row Level Security, builds a digest (`stats.ts`), asks Claude for structured output (`prompt.ts`), and stores the result in `coach_messages`: one per user, kind and period, so each message is paid for once.
 - It needs the `ANTHROPIC_API_KEY` secret (Supabase → Edge Functions → Secrets).
 - Deploy with `SUPABASE_ACCESS_TOKEN=… npx supabase functions deploy coach --project-ref <ref> --use-api`.

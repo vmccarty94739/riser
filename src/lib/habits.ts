@@ -70,6 +70,8 @@ export type Settings = {
   coach: boolean;
   /** The Dashboard already offered the coach once (so the offer doesn't keep coming back). */
   coachAsked: boolean;
+  /** The user switched the coach off (it's on by default while it runs on the device). */
+  coachOff: boolean;
 };
 
 /** The trophy ladder. Each win auto-starts the next rung; the last repeats. */

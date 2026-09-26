@@ -108,19 +108,21 @@ The user designs by five layers; check new work against them: **core function** 
 - **Auth emails** go out through Gmail SMTP as `riserapp.support@gmail.com` (the Supabase free plan requires custom SMTP before templates can be edited). The Reset Password template shows `{{ .Token }}`; this project's email codes are 8 digits. "Confirm email" is off and anonymous sign-ins are on.
 - Supabase error messages go through `authMessage()` in `src/lib/auth.ts`. Forms live in `src/components/auth-forms.tsx` and are shared by Settings' `AccountCard` and onboarding.
 
-### AI coach (Claude via a Supabase Edge Function)
-- **Flow:** `useCoach(kind, today)` (`src/hooks/use-coach.ts`) → `requestCoach` (`src/lib/coach.ts`) → `supabase.functions.invoke('coach', { kind, today })` → `supabase/functions/coach/index.ts` (Deno).
-  - The function verifies the user, reads their habits, check-ins and challenges **as the user** (RLS), and builds a text digest with `stats.ts` (pure; tested with `deno test supabase/functions/coach`).
-  - Model setups live in `generate.ts` (`DAILY`, `REFLECTION`), shared with `eval.ts`. That script runs the real prompt on 5 personas across setups, checks habit-specific tips, invented numbers and length, and reports cost. Pick the cheapest setup that passes. Run it with `deno run --allow-net --allow-env --allow-read --env-file=../../../.env.local eval.ts` from the function dir, with the key in the gitignored `.env.local`.
-  - It calls Claude through `client.messages.parse` with a zod schema (`prompt.ts`). The daily nudge uses `claude-haiku-4-5` with no thinking (Haiku 4.5 has no adaptive thinking or effort). Weekly/monthly reflections use `claude-sonnet-5` with adaptive thinking at effort `medium`. The choice is the user's, for cost.
-  - The result is stored in `coach_messages` with the service role.
-- **Kinds and periods:** `daily` (last 14 days incl. today; cached per day), `weekly` (last 7 full days; cached per Monday-week), `monthly` (last 30 full days; cached per calendar month). The period is `periodStart` in the function, mirrored by `coachPeriod` in the app. Existing rows are returned without calling Claude. There's a global cap of 3,000 new messages per 24h, and dates more than ±2 days from the server's are rejected.
-- **Consent:** off by default (`settings.coach`, plus `coachAsked` for the one-time Dashboard offer). Nothing is sent until the user opts in, per App Store guideline 5.1.2(i). Keep `COACH_ABOUT`, `store/PRIVACY_POLICY.md` and the store notes in step if what's sent changes.
-- **UI:** `CoachNudge` sits on the Dashboard under the level strip, and `CoachReport` (weekly/monthly) under "Coach's Report" on the Progress Report. The latest daily nudge becomes the next morning notification (`planReminders(…, coach)`), since there's no remote push.
-- **Operations:**
-  - The Anthropic key lives only in the `ANTHROPIC_API_KEY` Supabase secret. Without it the function returns 503 `coach_not_configured`, and the app hides the coach.
-  - `supabase/functions/**` is excluded from the app's `tsconfig`/ESLint. Type-check it with `deno check supabase/functions/coach/index.ts`; the function's `deno.json` sets `nodeModulesDir: none`.
-  - Deno refuses npm versions newer than 24h, so pin slightly older ones.
+### Coach (on-device now; Claude-ready)
+- **Engine switch:** `COACH_ENGINE` in `src/lib/coach.ts`. It is `'device'` now, chosen by the user to keep it free until the app is profitable, then switch to `'claude'`. Both engines use the same digest (`supabase/functions/coach/stats.ts`, pure, imported by the app via a relative path) and the same instructions (`prompt-text.ts`).
+- **Device engine:** `writeLocally` builds the digest from local data. It then tries `writeOnDevice` (`src/lib/coach-device.ts`, `expo-local-llm`: Apple Foundation Models on iOS 26+ with Apple Intelligence, Gemini Nano on supported Android).
+  - Answers are validated: required fields, lengths, every number present in the digest, and the daily tip naming a habit. On failure or unavailability it falls back to `src/lib/coach-rules.ts` (rule-based, tested). `source` records `device`/`rules`/`claude`, and `Byline` shows it.
+  - `expo-local-llm` is a native module, so it's absent in Expo Go, which always gets the rules. Test the real model with an EAS build: `preview` for devices, or `preview-simulator` for the iOS Simulator (needs a Mac with Apple Intelligence).
+  - It's a small community package (~600 downloads/mo), so re-check it on SDK upgrades.
+  - Nothing leaves the phone, so there's no consent card. The coach is on unless `settings.coachOff` is set.
+- **Claude engine (dormant, deployed):**
+  - Flow: `useCoach` → `requestCoach` → `supabase.functions.invoke('coach')` → `supabase/functions/coach/index.ts` (Deno), which reads the user's data through RLS, asks Claude (`generate.ts` setups: daily `claude-haiku-4-5` without thinking, reflections `claude-sonnet-5` at effort medium), and stores the result in `coach_messages`, once per user, kind and period.
+  - It needs the `ANTHROPIC_API_KEY` Supabase secret, and the user's opt-in (`settings.coach`, with `coachAsked` for the one-time offer) per App Store guideline 5.1.2(i).
+  - Before switching: run `eval.ts` to choose the cheapest passing daily setup, and restore the Anthropic paragraphs in `store/PRIVACY_POLICY.md`/`STORE_LISTING.md` (see git history).
+  - The global cap is 3,000 messages/24h, and dates more than ±2 days from the server's are rejected.
+- **Periods:** `daily` covers the last 14 days incl. today (today counts as "not yet", never a miss) and is written once per day. `weekly` covers the last 7 full days, once per Monday-week. `monthly` covers the last 30 full days, once per month. Messages are cached on the phone (`riser.coach.v1`), and `useCoach` waits for that cache before writing so launches don't rewrite them.
+- **UI:** `CoachNudge` sits on the Dashboard under the level strip, and `CoachReport` under "Coach's Report" on the Progress Report. The latest daily nudge becomes the next morning notification (`planReminders(…, coach)`).
+- **Function ops:** `supabase/functions/**` is excluded from the app's tsconfig/ESLint. Type-check with `deno check supabase/functions/coach/index.ts` from the function dir, test with `deno test supabase/functions/coach`, and deploy with `SUPABASE_ACCESS_TOKEN=… npx supabase functions deploy coach --project-ref <ref> --use-api`. Deno refuses npm versions newer than 24h, so pin slightly older ones.
 
 ### UI conventions
 - **Colors** come from `Colors` in `src/constants/theme.ts`; every key must exist in both light and dark.
