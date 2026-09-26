@@ -3,6 +3,8 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Segmented } from '@/components/habit-fields';
+import { InfoButton } from '@/components/info-button';
+import { SectionHeading } from '@/components/section-heading';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -47,7 +49,7 @@ export function CoachOptIn({ onDismiss }: { onDismiss?: () => void }) {
   return (
     <ThemedView type="accentSoft" style={styles.card}>
       <View style={styles.row}>
-        <ThemedText style={styles.icon}>🧠</ThemedText>
+        <ThemedText style={styles.icon}>🧑‍🏫</ThemedText>
         <View style={styles.flex}>
           <ThemedText type="smallBold">Meet your AI coach</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
@@ -104,7 +106,16 @@ function Failed({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
   );
 }
 
-/** Dashboard: today's nudge, or the one-time offer to turn the coach on. */
+function CoachHeading() {
+  return (
+    <SectionHeading
+      title="Coach"
+      accessory={<InfoButton title="Your coach" text={COACH_ABOUT} />}
+    />
+  );
+}
+
+/** Dashboard: today's nudge under a "Coach" heading (or the one-time offer to turn it on). */
 export function CoachNudge({ today }: { today: string }) {
   const theme = useTheme();
   const { settings, updateSettings } = useHabits();
@@ -114,42 +125,56 @@ export function CoachNudge({ today }: { today: string }) {
   if (!visible) return null;
   if (!onDevice && !settings.coach)
     return settings.coachAsked ? null : (
-      <CoachOptIn onDismiss={() => updateSettings({ coachAsked: true })} />
+      <>
+        <CoachHeading />
+        <CoachOptIn onDismiss={() => updateSettings({ coachAsked: true })} />
+      </>
     );
   if (state === 'loading')
     return (
-      <Pending
-        text={
-          onDevice
-            ? 'Your coach is looking at your last two weeks…'
-            : 'Your coach is reading your last two weeks…'
-        }
-      />
+      <>
+        <CoachHeading />
+        <Pending
+          text={
+            onDevice
+              ? 'Your coach is looking at your last two weeks…'
+              : 'Your coach is reading your last two weeks…'
+          }
+        />
+      </>
     );
   if (state === 'failed' || state === 'busy')
-    return <Failed busy={state === 'busy'} onRetry={retry} />;
+    return (
+      <>
+        <CoachHeading />
+        <Failed busy={state === 'busy'} onRetry={retry} />
+      </>
+    );
   if (state !== 'ready' || !message) return null;
 
   return (
-    <Animated.View entering={FadeIn}>
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <View style={styles.row}>
-          <ThemedText style={styles.icon}>🧠</ThemedText>
-          <View style={styles.flex}>
-            <ThemedText type="smallBold">{message.title}</ThemedText>
-            <ThemedText type="small">{message.body}</ThemedText>
+    <>
+      <CoachHeading />
+      <Animated.View entering={FadeIn}>
+        <ThemedView type="backgroundElement" style={styles.card}>
+          <View style={styles.row}>
+            <ThemedText style={styles.icon}>🧑‍🏫</ThemedText>
+            <View style={styles.flex}>
+              <ThemedText type="smallBold">{message.title}</ThemedText>
+              <ThemedText type="small">{message.body}</ThemedText>
+            </View>
           </View>
-        </View>
-        {message.tip && (
-          <ThemedView type="accentSoft" style={styles.tip}>
-            <ThemedText type="small" style={{ color: theme.accent }}>
-              💡 {message.tip}
-            </ThemedText>
-          </ThemedView>
-        )}
-        <Byline message={message} />
-      </ThemedView>
-    </Animated.View>
+          {message.tip && (
+            <ThemedView type="accentSoft" style={styles.tip}>
+              <ThemedText type="small" style={{ color: theme.accent }}>
+                💡 {message.tip}
+              </ThemedText>
+            </ThemedView>
+          )}
+          <Byline message={message} />
+        </ThemedView>
+      </Animated.View>
+    </>
   );
 }
 
@@ -162,13 +187,16 @@ function Report({ message, kind }: { message: CoachMessage; kind: 'weekly' | 'mo
   return (
     <Animated.View entering={FadeIn}>
       <ThemedView type="backgroundElement" style={styles.card}>
-        <View>
-          <ThemedText type="small" themeColor="textSecondary">
-            {range}
-          </ThemedText>
-          <ThemedText type="smallBold" style={styles.reportTitle}>
-            {message.title}
-          </ThemedText>
+        <View style={styles.row}>
+          <ThemedText style={styles.icon}>🧑‍🏫</ThemedText>
+          <View style={styles.flex}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {range}
+            </ThemedText>
+            <ThemedText type="smallBold" style={styles.reportTitle}>
+              {message.title}
+            </ThemedText>
+          </View>
         </View>
         <ThemedText type="small">{message.body}</ThemedText>
         {message.highlights.length > 0 && (

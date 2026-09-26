@@ -115,7 +115,7 @@ export function planReminders(
     // Morning: set the intention (or deliver the coach's nudge).
     const morning = at(day, settings.morning);
     if (settings.morningOn && coachNote && morning > now) {
-      planned.push({ date: morning, title: `🧠 ${coachNote.title}`, body: coachNote.body });
+      planned.push({ date: morning, title: `🧑‍🏫 ${coachNote.title}`, body: coachNote.body });
       coachNote = null;
     } else if (settings.morningOn)
       planned.push({

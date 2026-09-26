@@ -10,7 +10,7 @@ import {
   type HabitRow,
 } from '../../supabase/functions/coach/stats';
 import { writeOnDevice } from '@/lib/coach-device';
-import { dailyByRules, reflectionByRules } from '@/lib/coach-rules';
+import { dailyByRules, quoteHabits, reflectionByRules } from '@/lib/coach-rules';
 import { parseDay, type Challenge, type Habit } from '@/lib/habits';
 import { supabase } from '@/lib/supabase';
 
@@ -55,7 +55,7 @@ export type CoachResult =
 /** The app data the on-device coach reads. */
 export type CoachData = { habits: Habit[]; challenges: Challenge[] };
 
-const KEY = 'riser.coach.v1';
+const KEY = 'riser.coach.v2';
 /** Owner of on-device messages (they come from this phone's data, not an account). */
 const LOCAL = 'local';
 
@@ -121,7 +121,9 @@ export function requestCoach(
   const running = inflight.get(key);
   if (running) return running;
   const run = (
-    COACH_ENGINE === 'device' ? writeLocally(kind, today, data) : askClaude(kind, today, owner)
+    COACH_ENGINE === 'device'
+      ? writeLocally(kind, today, data)
+      : askClaude(kind, today, owner, data.habits)
   ).finally(() => inflight.delete(key));
   inflight.set(key, run);
   return run;
@@ -165,20 +167,28 @@ async function writeLocally(kind: CoachKind, today: string, data: CoachData): Pr
     (kind === 'daily'
       ? dailyByRules(digest, parseDay(today).getDay())
       : reflectionByRules(digest, kind === 'weekly' ? 'week' : 'month'));
-  const message: CoachMessage = {
-    kind,
-    period_start: coachPeriod(kind, today),
-    range_start: digest.range.start,
-    range_end: digest.range.end,
-    ...written,
-    created_at: new Date().toISOString(),
-    source: device ? 'device' : 'rules',
-  };
+  const message: CoachMessage = quoteHabits(
+    {
+      kind,
+      period_start: coachPeriod(kind, today),
+      range_start: digest.range.start,
+      range_end: digest.range.end,
+      ...written,
+      created_at: new Date().toISOString(),
+      source: device ? 'device' : 'rules',
+    },
+    data.habits.map((h) => h.name)
+  );
   save(LOCAL, message);
   return { ok: true, message };
 }
 
-async function askClaude(kind: CoachKind, today: string, userId: string): Promise<CoachResult> {
+async function askClaude(
+  kind: CoachKind,
+  today: string,
+  userId: string,
+  habits: Habit[]
+): Promise<CoachResult> {
   const db = supabase();
   if (!db) return { ok: false, reason: 'off' };
   const { data, error } = await db.functions.invoke<{ message: CoachMessage | null }>('coach', {
@@ -188,7 +198,12 @@ async function askClaude(kind: CoachKind, today: string, userId: string): Promis
     const status = error instanceof FunctionsHttpError ? error.context.status : 0;
     return { ok: false, reason: status === 503 ? 'off' : status === 429 ? 'busy' : 'failed' };
   }
-  const message = data?.message ? { ...data.message, source: 'claude' as const } : null;
+  const message = data?.message
+    ? quoteHabits(
+        { ...data.message, source: 'claude' as const },
+        habits.map((h) => h.name)
+      )
+    : null;
   if (message) save(userId, message);
   return { ok: true, message };
 }

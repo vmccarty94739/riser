@@ -5,7 +5,7 @@ import {
   type CheckinRow,
   type HabitRow,
 } from '../../../supabase/functions/coach/stats';
-import { dailyByRules, reflectionByRules, tipFor } from '@/lib/coach-rules';
+import { dailyByRules, quoteHabits, reflectionByRules, tipFor } from '@/lib/coach-rules';
 import { addDays, parseDay } from '@/lib/habits';
 
 import { TODAY } from './helpers';
@@ -130,5 +130,27 @@ describe('on-device coach', () => {
       challenges: [],
     });
     await expect(writeOnDevice('daily', digest)).resolves.toBeNull();
+  });
+});
+
+describe('quoteHabits', () => {
+  const m = (text: string) => ({ title: text, body: text, tip: text, highlights: [] });
+  const names = ['Walk', 'Drink water', 'Read'];
+
+  it('quotes habit names once, leaving other words alone', () => {
+    expect(quoteHabits(m('Tie Drink water to lunch, then Walk.'), names).tip).toBe(
+      'Tie “Drink water” to lunch, then “Walk”.'
+    );
+    expect(quoteHabits(m('Go for a walk and read tonight. Walking helps.'), names).tip).toBe(
+      'Go for a walk and read tonight. Walking helps.'
+    );
+  });
+
+  it('does not double-quote and curls straight quotes', () => {
+    expect(quoteHabits(m('“Walk” and "Read" are up.'), names).body).toBe(
+      '“Walk” and “Read” are up.'
+    );
+    const once = quoteHabits(m('Walk is at 50%'), names);
+    expect(quoteHabits(once, names).title).toBe('“Walk” is at 50%');
   });
 });

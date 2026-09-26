@@ -105,6 +105,33 @@ export function tipFor(h: Pick<HabitSummary, 'name' | 'kind'>, weekday?: string)
   return weekday ? `${LONG_DAY[weekday] ?? weekday} are when ${h.name} usually slips. ${tip}` : tip;
 }
 
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Puts every habit name the coach mentions in quotes (“Drink water”), so it stands out from the
+ * sentence around it. Matches the name as written (case-sensitive, whole words) and leaves names
+ * that are already quoted alone; straight quotes become curly ones.
+ */
+export function quoteHabits<
+  T extends { title: string; body: string; tip: string | null; highlights: Written['highlights'] },
+>(message: T, names: string[]): T {
+  const list = [...new Set(names.map((n) => n.trim()).filter(Boolean))].sort(
+    (a, b) => b.length - a.length
+  );
+  if (!list.length) return message;
+  const alt = list.map(escape).join('|');
+  const straight = new RegExp(`["'‘](${alt})["'’]`, 'g');
+  const bare = new RegExp(`(^|[^\\w“"'‘])(${alt})(?=$|[^\\w”"])`, 'g');
+  const quote = (text: string) => text.replace(straight, '“$1”').replace(bare, '$1“$2”');
+  return {
+    ...message,
+    title: quote(message.title),
+    body: quote(message.body),
+    tip: message.tip && quote(message.tip),
+    highlights: message.highlights.map((h) => ({ ...h, text: quote(h.text) })),
+  };
+}
+
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** Today's nudge: the one thing that matters most right now. */

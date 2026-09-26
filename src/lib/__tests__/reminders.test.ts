@@ -60,9 +60,9 @@ describe('reminder planning', () => {
       (p) => p.date.getHours() === 8
     );
     // It's noon, so today's 08:00 has passed: tomorrow morning carries the coach's message.
-    expect(mornings[0].title).toBe('🧠 Protect the streak');
+    expect(mornings[0].title).toBe('🧑‍🏫 Protect the streak');
     expect(mornings[0].body).toBe('Water is at 50% this week.');
-    expect(mornings.filter((p) => p.title.startsWith('🧠'))).toHaveLength(1);
+    expect(mornings.filter((p) => p.title.startsWith('🧑‍🏫'))).toHaveLength(1);
   });
 
   it('ignores a stale coach nudge', () => {
