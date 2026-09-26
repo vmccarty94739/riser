@@ -10,7 +10,8 @@ import { useTheme } from '@/hooks/use-theme';
  * A section heading inside a page (Habits, Challenges, Trophy Cabinet…). Deliberately smaller
  * than the page's large title. `accessory` sits right after the text (e.g. an ⓘ); `trailing`
  * is pushed to the right edge; `detail` is a plain line underneath. With `onToggle`, the heading
- * folds its section open and shut, with the same round arrow as the History days.
+ * folds its section open and shut, with the same round arrow as the History days. `sub` is a
+ * smaller heading for a section nested inside another (e.g. Graph inside Summary).
  */
 export function SectionHeading({
   title,
@@ -19,6 +20,7 @@ export function SectionHeading({
   detail,
   open,
   onToggle,
+  sub,
 }: {
   title: string;
   accessory?: ReactNode;
@@ -26,11 +28,16 @@ export function SectionHeading({
   detail?: string;
   open?: boolean;
   onToggle?: () => void;
+  sub?: boolean;
 }) {
   const theme = useTheme();
   const row = (
     <>
-      <ThemedText type="subtitle" numberOfLines={1} adjustsFontSizeToFit style={styles.title}>
+      <ThemedText
+        type="subtitle"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        style={[styles.title, sub && styles.subTitle]}>
         {title}
       </ThemedText>
       {accessory}
@@ -85,6 +92,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 30,
     flexShrink: 1,
+  },
+  subTitle: {
+    fontSize: 19,
+    lineHeight: 26,
   },
   spacer: {
     flex: 1,

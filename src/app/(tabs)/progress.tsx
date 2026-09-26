@@ -339,10 +339,11 @@ export default function ProgressScreen() {
         {...summaryFold}
       />
       {summaryFold.open && (
-        <>
+        <View style={[styles.nested, { borderColor: theme.backgroundSelected }]}>
           {selector}
 
           <SectionHeading
+            sub
             title="Trophy Cabinet"
             accessory={
               <InfoButton
@@ -370,6 +371,7 @@ export default function ProgressScreen() {
           ) : (
             <>
               <SectionHeading
+                sub
                 title="Graph"
                 accessory={
                   <InfoButton
@@ -428,6 +430,7 @@ export default function ProgressScreen() {
               )}
 
               <SectionHeading
+                sub
                 title="Calendar"
                 accessory={
                   <InfoButton
@@ -453,6 +456,7 @@ export default function ProgressScreen() {
               )}
 
               <SectionHeading
+                sub
                 title={`Habit Summary: Past ${range} Days`}
                 accessory={
                   <InfoButton
@@ -533,6 +537,7 @@ export default function ProgressScreen() {
               )}
 
               <SectionHeading
+                sub
                 title="History"
                 accessory={
                   <InfoButton
@@ -653,7 +658,7 @@ export default function ProgressScreen() {
               )}
             </>
           )}
-        </>
+        </View>
       )}
     </ScreenScroll>
   );
@@ -662,6 +667,13 @@ export default function ProgressScreen() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  // Everything inside Summary: indented behind a guide line so it reads as part of it.
+  nested: {
+    gap: Spacing.three,
+    borderLeftWidth: 2,
+    paddingLeft: Spacing.two + 2,
+    marginLeft: Spacing.one,
   },
   center: {
     textAlign: 'center',
