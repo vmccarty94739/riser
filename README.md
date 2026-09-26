@@ -10,7 +10,7 @@ Riser is a habit tracker for iOS and Android, built with Expo (React Native) and
 - **Build and Break habits.** You can quit smoking, vaping, alcohol, doomscrolling and more. A bad habit shows red until you log a clean day, then turns green.
 - **Trophy ladders.** Each habit climbs its own ladder of challenges, from 3 to 365 days, and each finished challenge starts the next one. You can also design custom challenges with their own trophy names.
 - **XP and levels.** Each level unlocks new app colors and chimes. XP is shared across your habits, so adding more habits doesn't speed up leveling.
-- **Progress Report.** Includes a trend graph by category, a 16-week calendar heatmap, a report card for every habit, your perfect-day streak and full history.
+- **Progress Report.** Includes a trend graph by category, a 16-week calendar heatmap, a summary of every habit, your perfect-day streak and full history.
 - **Camera Roll.** Holds the proof photos attached to completed habits, sorted by date.
 - **Coach.** A daily nudge plus weekly and monthly reports built from your real streaks. They're written on the phone by its built-in AI (Apple Intelligence or Gemini Nano) where available, or by the app's rule-based coach otherwise. Nothing leaves the device. A Claude-powered version is built and deployed but switched off (`COACH_ENGINE` in `src/lib/coach.ts`).
 - **Reminders.** A morning intention, reminders at times you choose, and an evening nudge only when something is still open. All are local notifications.

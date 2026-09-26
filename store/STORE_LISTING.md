@@ -35,7 +35,7 @@ LEVEL UP
 Every check-in, perfect day and trophy earns XP. Level up to unlock new app colors and chimes. XP is shared across your habits, so it's about doing all of them — not just adding more.
 
 SEE YOUR PROGRESS
-A trend graph by category, a 16-week calendar, a report card for every habit, your perfect-day streak and full history — for good and bad habits.
+A trend graph by category, a 16-week calendar, a summary of every habit, your perfect-day streak and full history — for good and bad habits.
 
 PROOF PHOTOS
 Snap a photo when you complete a habit. Your Camera Roll keeps them all, sorted by date.

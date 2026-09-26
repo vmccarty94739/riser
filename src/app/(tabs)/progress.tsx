@@ -255,6 +255,7 @@ export default function ProgressScreen() {
   const graphFold = useFold('progress:graph');
   const calendarFold = useFold('progress:calendar');
   const reportFold = useFold('progress:report-card');
+  const historyFold = useFold('progress:history');
   const [kind, setKind] = useState<HabitKind>('build');
   const [range, setRange] = useState<Range>(7);
   const [historyDays, setHistoryDays] = useState(7);
@@ -410,7 +411,6 @@ export default function ProgressScreen() {
 
           <SectionHeading
             title="Calendar"
-            detail="Last 16 weeks"
             accessory={
               <InfoButton
                 title="Calendar"
@@ -435,11 +435,10 @@ export default function ProgressScreen() {
           )}
 
           <SectionHeading
-            title="Habit Report Card"
-            detail={`Last ${range} days`}
+            title={`Habit Summary: Past ${range} Days`}
             accessory={
               <InfoButton
-                title="Habit Report Card"
+                title="Habit Summary"
                 text={`How each habit did in the period you picked: ${
                   quit ? 'clean days' : 'days completed'
                 } out of the days it existed, the bar showing that share, and 🔥 its current streak. Tap a habit to open it.`}
@@ -525,109 +524,115 @@ export default function ProgressScreen() {
                 }. Faded icons are the ones you missed. Tap a day to see each habit's result.`}
               />
             }
+            {...historyFold}
           />
-          <ThemedView type="backgroundElement" style={styles.list}>
-            {history.map((day, i) => {
-              const active = activeOn(list, day);
-              const doneCount = active.filter((h) => isDone(h, day)).length;
-              const expanded = openDay === day;
-              const allDone = active.length > 0 && doneCount === active.length;
-              return (
-                <View
-                  key={day}
-                  style={
-                    i > 0 && {
-                      borderTopWidth: StyleSheet.hairlineWidth,
-                      borderColor: theme.backgroundSelected,
-                    }
-                  }>
-                  <Pressable
-                    onPress={() => setOpenDay(expanded ? null : day)}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded }}
-                    style={styles.historyRow}>
-                    <View style={styles.historyDate}>
-                      <ThemedText type="smallBold">
-                        {day === today
-                          ? 'Today'
-                          : day === addDays(today, -1)
-                            ? 'Yesterday'
-                            : fmtDay(day, { weekday: 'short' })}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.historySub}>
-                        {fmtDay(day, { month: 'short', day: 'numeric' })}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.historyIcons}>
-                      {active.slice(0, 7).map((h) => (
-                        <View key={h.id} style={!isDone(h, day) && styles.missedIcon}>
-                          <HabitIcon icon={h.emoji} size={17} />
-                        </View>
-                      ))}
-                      {active.length > 7 && (
-                        <ThemedText type="small" themeColor="textSecondary">
-                          +{active.length - 7}
+          {historyFold.open && (
+            <ThemedView type="backgroundElement" style={styles.list}>
+              {history.map((day, i) => {
+                const active = activeOn(list, day);
+                const doneCount = active.filter((h) => isDone(h, day)).length;
+                const expanded = openDay === day;
+                const allDone = active.length > 0 && doneCount === active.length;
+                return (
+                  <View
+                    key={day}
+                    style={
+                      i > 0 && {
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderColor: theme.backgroundSelected,
+                      }
+                    }>
+                    <Pressable
+                      onPress={() => setOpenDay(expanded ? null : day)}
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded }}
+                      style={styles.historyRow}>
+                      <View style={styles.historyDate}>
+                        <ThemedText type="smallBold">
+                          {day === today
+                            ? 'Today'
+                            : day === addDays(today, -1)
+                              ? 'Yesterday'
+                              : fmtDay(day, { weekday: 'short' })}
                         </ThemedText>
-                      )}
-                    </View>
-                    <ThemedText
-                      type="smallBold"
-                      style={{ color: allDone ? theme.success : theme.textSecondary }}>
-                      {doneCount}/{active.length}
-                    </ThemedText>
-                    <View style={[styles.chevronWrap, { backgroundColor: theme.background }]}>
-                      <ThemedText
-                        themeColor="textSecondary"
-                        style={[styles.chevron, expanded && styles.chevronOpen]}>
-                        ›
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                  {expanded && (
-                    <Animated.View entering={FadeIn} style={styles.historyDetail}>
-                      {active.map((h) => {
-                        const count = countOn(h, day);
-                        const done = isDone(h, day);
-                        return (
-                          <View key={h.id} style={styles.detailRow}>
-                            <HabitIcon icon={h.emoji} size={16} />
-                            <ThemedText type="small" numberOfLines={1} style={styles.flex}>
-                              {h.name}
-                            </ThemedText>
-                            <ThemedText
-                              type="small"
-                              style={{
-                                color: done ? theme.success : theme.textSecondary,
-                                fontWeight: done ? 700 : 500,
-                              }}>
-                              {quit
-                                ? done
-                                  ? 'Clean ✓'
-                                  : 'Not logged'
-                                : h.target > 1
-                                  ? `${count}/${h.target}`
-                                  : done
-                                    ? 'Done ✓'
-                                    : 'Missed'}
-                            </ThemedText>
+                        <ThemedText
+                          type="small"
+                          themeColor="textSecondary"
+                          style={styles.historySub}>
+                          {fmtDay(day, { month: 'short', day: 'numeric' })}
+                        </ThemedText>
+                      </View>
+                      <View style={styles.historyIcons}>
+                        {active.slice(0, 7).map((h) => (
+                          <View key={h.id} style={!isDone(h, day) && styles.missedIcon}>
+                            <HabitIcon icon={h.emoji} size={17} />
                           </View>
-                        );
-                      })}
-                    </Animated.View>
-                  )}
-                </View>
-              );
-            })}
-            {historyDays < totalDays && (
-              <Pressable
-                onPress={() => setHistoryDays((d) => d + 14)}
-                style={[styles.more, { borderColor: theme.backgroundSelected }]}>
-                <ThemedText type="small" style={{ color: theme.accent }}>
-                  Show earlier days
-                </ThemedText>
-              </Pressable>
-            )}
-          </ThemedView>
+                        ))}
+                        {active.length > 7 && (
+                          <ThemedText type="small" themeColor="textSecondary">
+                            +{active.length - 7}
+                          </ThemedText>
+                        )}
+                      </View>
+                      <ThemedText
+                        type="smallBold"
+                        style={{ color: allDone ? theme.success : theme.textSecondary }}>
+                        {doneCount}/{active.length}
+                      </ThemedText>
+                      <View style={[styles.chevronWrap, { backgroundColor: theme.background }]}>
+                        <ThemedText
+                          themeColor="textSecondary"
+                          style={[styles.chevron, expanded && styles.chevronOpen]}>
+                          ›
+                        </ThemedText>
+                      </View>
+                    </Pressable>
+                    {expanded && (
+                      <Animated.View entering={FadeIn} style={styles.historyDetail}>
+                        {active.map((h) => {
+                          const count = countOn(h, day);
+                          const done = isDone(h, day);
+                          return (
+                            <View key={h.id} style={styles.detailRow}>
+                              <HabitIcon icon={h.emoji} size={16} />
+                              <ThemedText type="small" numberOfLines={1} style={styles.flex}>
+                                {h.name}
+                              </ThemedText>
+                              <ThemedText
+                                type="small"
+                                style={{
+                                  color: done ? theme.success : theme.textSecondary,
+                                  fontWeight: done ? 700 : 500,
+                                }}>
+                                {quit
+                                  ? done
+                                    ? 'Clean ✓'
+                                    : 'Not logged'
+                                  : h.target > 1
+                                    ? `${count}/${h.target}`
+                                    : done
+                                      ? 'Done ✓'
+                                      : 'Missed'}
+                              </ThemedText>
+                            </View>
+                          );
+                        })}
+                      </Animated.View>
+                    )}
+                  </View>
+                );
+              })}
+              {historyDays < totalDays && (
+                <Pressable
+                  onPress={() => setHistoryDays((d) => d + 14)}
+                  style={[styles.more, { borderColor: theme.backgroundSelected }]}>
+                  <ThemedText type="small" style={{ color: theme.accent }}>
+                    Show earlier days
+                  </ThemedText>
+                </Pressable>
+              )}
+            </ThemedView>
+          )}
         </>
       )}
     </ScreenScroll>

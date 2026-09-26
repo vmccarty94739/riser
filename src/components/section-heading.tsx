@@ -30,7 +30,7 @@ export function SectionHeading({
   const theme = useTheme();
   const row = (
     <>
-      <ThemedText type="subtitle" style={styles.title}>
+      <ThemedText type="subtitle" numberOfLines={1} adjustsFontSizeToFit style={styles.title}>
         {title}
       </ThemedText>
       {accessory}
@@ -84,6 +84,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     lineHeight: 30,
+    flexShrink: 1,
   },
   spacer: {
     flex: 1,

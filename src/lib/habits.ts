@@ -64,7 +64,7 @@ export type Settings = {
   /** Swatch ids (see `THEME_SWATCHES`) for the two main UI colors. */
   accent: string;
   gold: string;
-  /** Collapsed Dashboard category sections, as `kind:categoryKey`. */
+  /** Folded page sections, e.g. `dash:challenges` or `progress:graph`. */
   collapsed: string[];
   /** The user agreed to send habit data to the AI coach (off until they opt in). */
   coach: boolean;

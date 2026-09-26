@@ -40,7 +40,7 @@ function greeting() {
 
 export default function DashboardScreen() {
   const theme = useTheme();
-  const { habits, challenges, loaded, startChallenge, settings, toggleCollapsed } = useHabits();
+  const { habits, challenges, loaded, startChallenge } = useHabits();
   const today = dayKey();
   const [offset, setOffset] = useState(0);
   const day = addDays(today, offset);
@@ -100,9 +100,10 @@ export default function DashboardScreen() {
       : null;
 
   const renderPage = (list: Habit[], kind: HabitKind, index: 0 | 1) => {
-    const sections = categoriesFor(kind)
-      .map((c) => ({ ...c, habits: list.filter((h) => categoryOf(kind, h.emoji).key === c.key) }))
-      .filter((c) => c.habits.length);
+    // Always shown, never folded: habits of the same kind (health, mind…) sit together.
+    const ordered = categoriesFor(kind).flatMap((c) =>
+      list.filter((h) => categoryOf(kind, h.emoji).key === c.key)
+    );
     return (
       <View
         style={[styles.page, { width }]}
@@ -112,43 +113,13 @@ export default function DashboardScreen() {
             prev[index] === h ? prev : index === 0 ? [h, prev[1]] : [prev[0], h]
           );
         }}>
-        {sections.map((section) => {
-          const key = `${kind}:${section.key}`;
-          const collapsed = settings.collapsed.includes(key);
-          const done = section.habits.filter((h) => isDone(h, day)).length;
-          return (
-            <View key={key} style={styles.section}>
-              <Pressable
-                onPress={() => {
-                  if (Platform.OS !== 'web') Haptics.selectionAsync();
-                  toggleCollapsed(key);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ expanded: !collapsed }}
-                style={[styles.sectionHeader, { backgroundColor: theme.backgroundElement }]}>
-                <ThemedText style={styles.sectionIcon}>{section.icon}</ThemedText>
-                <ThemedText type="smallBold" style={styles.flex}>
-                  {section.label}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {done}/{section.habits.length}
-                </ThemedText>
-                <ThemedText
-                  themeColor="textSecondary"
-                  style={[styles.chevron, !collapsed && styles.chevronOpen]}>
-                  ›
-                </ThemedText>
-              </Pressable>
-              {!collapsed && (
-                <Animated.View entering={FadeIn} style={styles.rows}>
-                  {section.habits.map((habit) => (
-                    <HabitRow key={habit.id} habit={habit} day={day} />
-                  ))}
-                </Animated.View>
-              )}
-            </View>
-          );
-        })}
+        {ordered.length > 0 && (
+          <View style={styles.rows}>
+            {ordered.map((habit) => (
+              <HabitRow key={habit.id} habit={habit} day={day} />
+            ))}
+          </View>
+        )}
         {!list.length && (
           <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
             {kind === 'quit'
@@ -453,27 +424,6 @@ const styles = StyleSheet.create({
   },
   page: {
     gap: Spacing.three,
-  },
-  section: {
-    gap: Spacing.two,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two + Spacing.one,
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
-  },
-  sectionIcon: {
-    fontSize: 20,
-    lineHeight: 26,
-  },
-  chevron: {
-    fontSize: 22,
-    lineHeight: 24,
-    width: 16,
-    textAlign: 'center',
   },
   chevronOpen: {
     transform: [{ rotate: '90deg' }],

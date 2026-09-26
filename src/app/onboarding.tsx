@@ -373,7 +373,7 @@ export default function OnboardingScreen() {
           {
             icon: '📊',
             title: 'Progress Report: see how you’re doing',
-            body: 'Your trophy cabinet, perfect-day streak, charts, a calendar of your consistency, a report card for every habit, and your full history, for good and bad habits.',
+            body: 'Your trophy cabinet, perfect-day streak, charts, a calendar of your consistency, a summary of every habit, and your full history, for good and bad habits.',
           },
           {
             icon: '📷',
