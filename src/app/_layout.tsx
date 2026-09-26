@@ -8,6 +8,7 @@ import { Appearance, AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useCoach } from '@/hooks/use-coach';
+import { useCoachVisits } from '@/hooks/use-coach-visit';
 import { dayKey, HabitsProvider, useHabits } from '@/hooks/use-habits';
 import { CloudProvider, useCloud } from '@/hooks/use-cloud';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -118,6 +119,8 @@ function ReminderSync() {
   const cloud = useCloud();
   // Writes today's coach nudge even if Progress isn't opened, for the morning notification.
   useCoach('daily', dayKey());
+  // Fresh coaching each time the app is opened (Dashboard card, Coach's Report "Today").
+  useCoachVisits();
   const daily = useSyncExternalStore(subscribeCoach, () => coachMessage('daily', cloud.user?.id));
   const coachOn = COACH_ENGINE === 'device' ? !settings.coachOff : settings.coach;
   const coach =

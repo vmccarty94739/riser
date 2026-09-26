@@ -50,6 +50,20 @@ const QUIT_TIPS: [RegExp, string][] = [
   ],
   [/gambl|bet/i, 'Delete the betting app from your home screen and log out today.'],
   [
+    /caffeine|coffee|energy drink/i,
+    'Switch your afternoon cup to decaf or tea. It’s the one that costs you sleep.',
+  ],
+  [/nail|bite|biting/i, 'Keep your hands busy: carry something to fidget with when you’re idle.'],
+  [
+    /game|gaming|netflix|tv|youtube|binge/i,
+    'Decide your stopping time before you start and set a timer for it.',
+  ],
+  [
+    /spend|shopping|buy|impulse/i,
+    'Remove your saved card from shopping apps so every purchase takes an extra minute.',
+  ],
+  [/swear|curs/i, 'Pick a replacement word and use it on purpose the next time you slip.'],
+  [
     /porn/i,
     'Keep your phone out of the bedroom tonight. The easiest urge to beat is the one you never meet.',
   ],
@@ -88,20 +102,50 @@ const BUILD_TIPS: [RegExp, string][] = [
     'Keep the notebook open by your bed and write just one line before sleep.',
   ],
   [
+    /sunset|sunrise|outside|outdoor|nature|sun\b/i,
+    'Check today’s sunset time and set an alarm 15 minutes before, so you’re already heading out.',
+  ],
+  [
+    /study|learn|practice|language|duolingo|course|homework/i,
+    'Start with just 5 minutes. Once you’ve opened it, keeping going is the easy part.',
+  ],
+  [/floss|teeth/i, 'Leave the floss next to your toothbrush, where you can’t miss it.'],
+  [
+    /vitamin|pill|supplement|medic/i,
+    'Put them next to your coffee maker or toothbrush, so you see them at the same time every day.',
+  ],
+  [
+    /clean|tidy|chore|dishes|laundry/i,
+    'Set a 10-minute timer and stop when it rings. Small and done beats big and skipped.',
+  ],
+  [
+    /call|text|family|friend|mom|dad/i,
+    'Pick who you’ll reach out to now and send it before lunch, even if it’s one line.',
+  ],
+  [
+    /save|budget|money/i,
+    'Move a small amount to savings right now; automate it once it feels normal.',
+  ],
+  [
     /veg|fruit|salad|protein|cook/i,
     'Prep it the night before so it’s the easiest thing to grab tomorrow.',
   ],
 ];
 
-export function tipFor(h: Pick<HabitSummary, 'name' | 'kind'>, weekday?: string) {
+/** A tip written for this kind of habit, or null when its name isn't recognised. */
+export function specificTip(h: Pick<HabitSummary, 'name' | 'kind'>) {
   const match = (h.kind === 'quit' ? QUIT_TIPS : BUILD_TIPS).find(([pattern]) =>
     pattern.test(h.name)
   );
-  const tip = match
-    ? match[1]
-    : h.kind === 'quit'
+  return match ? match[1] : null;
+}
+
+export function tipFor(h: Pick<HabitSummary, 'name' | 'kind'>, weekday?: string) {
+  const tip =
+    specificTip(h) ??
+    (h.kind === 'quit'
       ? `Notice when ${h.name} tends to happen and plan one thing to do instead at that moment.`
-      : `Tie ${h.name} to something you already do every day, like right after your morning coffee.`;
+      : `Pick one exact time for ${h.name} today and tie it to something you already do then.`);
   return weekday ? `${LONG_DAY[weekday] ?? weekday} are when ${h.name} usually slips. ${tip}` : tip;
 }
 

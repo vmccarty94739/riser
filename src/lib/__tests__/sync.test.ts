@@ -67,6 +67,18 @@ describe('sync diff', () => {
     );
     expect(diff(state({ seenLevel: 4 }), snap).profile?.seen_level).toBe(4);
   });
+
+  it('keeps the first name on the phone: never uploaded, never overwritten', () => {
+    const named = state({ settings: { ...DEFAULT_SETTINGS, name: 'Vaden' } });
+    expect(diff(named, EMPTY_SNAPSHOT).profile?.settings).not.toHaveProperty('name');
+    expect(hasChanges(diff(named, snapshotOf(state())))).toBe(false);
+    const incoming = remote({
+      profile: { seen_level: 3, settings: { ...DEFAULT_SETTINGS, sound: false, name: '' } },
+    });
+    const merged = mergeRemote(named, snapshotOf(named), incoming, 'replace').state;
+    expect(merged.settings.sound).toBe(false);
+    expect(merged.settings.name).toBe('Vaden');
+  });
 });
 
 describe('sync merge', () => {

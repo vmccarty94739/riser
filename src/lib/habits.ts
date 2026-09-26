@@ -72,6 +72,11 @@ export type Settings = {
   coachAsked: boolean;
   /** The user switched the coach off (it's on by default while it runs on the device). */
   coachOff: boolean;
+  /** First name the coach greets the user by ("Hey Vaden…"). Empty = no name. */
+  name: string;
+  /** Afternoon notification with a personal insight from the coach, `HH:MM`. */
+  coachPushOn: boolean;
+  coachPush: string;
 };
 
 /** The trophy ladder. Each win auto-starts the next rung; the last repeats. */

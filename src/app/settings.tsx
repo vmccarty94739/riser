@@ -13,6 +13,7 @@ import {
 import { AccountCard } from '@/components/account-card';
 import { DevTools } from '@/components/dev-tools';
 import { Section, Segmented } from '@/components/habit-fields';
+import { CoachNameField } from '@/components/coach-name-field';
 import { TimeField } from '@/components/time-picker';
 import { SheetScreen } from '@/components/sheet-screen';
 import { ThemedText } from '@/components/themed-text';
@@ -208,10 +209,18 @@ export default function SettingsScreen() {
         <Section label="COACH">
           <Row
             title="Coach"
-            detail="A daily nudge plus weekly and monthly reports, written on your phone. Nothing leaves your device."
+            detail="Fresh coaching each time you open the app, plus weekly and monthly reports, written on your phone. Nothing leaves your device."
             value={!settings.coachOff}
             onChange={(on) => updateSettings({ coachOff: !on })}
           />
+          {!settings.coachOff && (
+            <>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sub}>
+                What should your coach call you?
+              </ThemedText>
+              <CoachNameField />
+            </>
+          )}
         </Section>
       ) : (
         cloud.configured && (
@@ -230,7 +239,9 @@ export default function SettingsScreen() {
         <Row
           title="Daily reminders"
           detail={
-            native ? 'A morning intention and an evening nudge' : 'Available in the mobile app'
+            native
+              ? 'A morning intention, a coach tip and an evening nudge'
+              : 'Available in the mobile app'
           }
           value={settings.reminders}
           onChange={toggleReminders}
@@ -266,6 +277,16 @@ export default function SettingsScreen() {
               onToggle={(eveningOn) => updateSettings({ eveningOn })}
               onTime={(evening) => updateSettings({ evening })}
             />
+            {!settings.coachOff && (
+              <TimeRow
+                title="Coach tip"
+                detail="A personal insight about your habits"
+                on={settings.coachPushOn}
+                time={settings.coachPush}
+                onToggle={(coachPushOn) => updateSettings({ coachPushOn })}
+                onTime={(coachPush) => updateSettings({ coachPush })}
+              />
+            )}
             <ThemedText type="small" themeColor="textSecondary" style={styles.sub}>
               Each habit can have its own reminder times too. Open a habit and tap Edit.
             </ThemedText>

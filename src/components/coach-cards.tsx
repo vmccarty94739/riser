@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useCloud } from '@/hooks/use-cloud';
 import { useCoach } from '@/hooks/use-coach';
+import { useVisitCoach } from '@/hooks/use-coach-visit';
 import { fmtDay, useHabits } from '@/hooks/use-habits';
 import { useTheme } from '@/hooks/use-theme';
 import { COACH_ENGINE, type CoachKind, type CoachMessage } from '@/lib/coach';
@@ -17,12 +18,12 @@ const onDevice = COACH_ENGINE === 'device';
 
 /** Shown in ⓘ (and the Claude opt-in): what the coach does and where the data goes. */
 export const COACH_ABOUT = onDevice
-  ? `Your coach reads your streaks and check-ins and writes you a nudge each day, plus a weekly and monthly report. On phones with ${DEVICE_MODEL_NAME}, the AI built into your phone writes it; otherwise it’s put together from your numbers. Everything stays on your phone. You can turn the coach off in Settings.`
+  ? `Your coach studies your streaks and check-ins for patterns, like a habit you’re crushing next to one that’s slipping, or a weekday that keeps going wrong, and gives you fresh coaching each time you open the app, an afternoon tip, plus a weekly and monthly report. On phones with ${DEVICE_MODEL_NAME}, the AI built into your phone writes it; otherwise it’s put together from your numbers. Everything stays on your phone. You can turn the coach off in Settings.`
   : 'Your coach reads your streaks and check-ins and writes you a personal nudge each day, plus a weekly and monthly report. It’s written by AI (Anthropic’s Claude). To do that, your habit names and check-in history are sent to Anthropic. Nothing else is shared, and you can turn the coach off anytime in Settings.';
 
 /** Who wrote a message, in a few words. */
-function Byline({ message }: { message: CoachMessage }) {
-  if (message.source === 'rules') return null;
+function Byline({ message }: { message: Pick<CoachMessage, 'source'> }) {
+  if (!message.source || message.source === 'rules') return null;
   return (
     <ThemedText type="small" themeColor="textSecondary" style={styles.byline}>
       {message.source === 'claude'
@@ -104,8 +105,10 @@ function Failed({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
   );
 }
 
-/** Today's nudge: what matters most right now, and a tip for it. */
-function Nudge({ message }: { message: CoachMessage }) {
+type NudgeContent = Pick<CoachMessage, 'title' | 'body' | 'tip' | 'source'>;
+
+/** A piece of coaching: what the coach noticed, and a tip for it. */
+function Nudge({ message, onDismiss }: { message: NudgeContent; onDismiss?: () => void }) {
   const theme = useTheme();
   return (
     <Animated.View entering={FadeIn}>
@@ -113,6 +116,22 @@ function Nudge({ message }: { message: CoachMessage }) {
         <View style={styles.row}>
           <ThemedText style={styles.icon}>🧑‍🏫</ThemedText>
           <View style={styles.flex}>
+            {onDismiss && (
+              <View style={styles.labelRow}>
+                <ThemedText type="small" style={[styles.label, { color: theme.accent }]}>
+                  YOUR COACH
+                </ThemedText>
+                <Pressable
+                  onPress={onDismiss}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel="Hide coach tip">
+                  <ThemedText themeColor="textSecondary" style={styles.close}>
+                    ✕
+                  </ThemedText>
+                </Pressable>
+              </View>
+            )}
             <ThemedText type="smallBold">{message.title}</ThemedText>
             <ThemedText type="small">{message.body}</ThemedText>
           </View>
@@ -128,6 +147,14 @@ function Nudge({ message }: { message: CoachMessage }) {
       </ThemedView>
     </Animated.View>
   );
+}
+
+/** Dashboard: fresh coaching each time the user opens the app; ✕ hides it until the next visit. */
+export function CoachVisitCard() {
+  const { coach, dismiss } = useVisitCoach();
+  if (!coach || coach.dismissed) return null;
+  if (coach.writing) return <Pending text="Your coach is looking at your habits…" />;
+  return <Nudge message={coach} onDismiss={dismiss} />;
 }
 
 function Report({ message, kind }: { message: CoachMessage; kind: 'weekly' | 'monthly' }) {
@@ -181,7 +208,10 @@ export function CoachReport({ today }: { today: string }) {
   const { settings } = useHabits();
   const visible = useCoachVisible();
   const [kind, setKind] = useState<CoachKind>('daily');
-  const { state, message, retry } = useCoach(kind, today);
+  // On-device, "Today" is this visit's coaching (fresh each time the app is opened).
+  const visitMode = onDevice && kind === 'daily';
+  const { state, message, retry } = useCoach(kind, today, { enabled: !visitMode });
+  const { coach } = useVisitCoach();
 
   if (!visible || state === 'off') return null;
   if (!onDevice && !settings.coach) return <CoachOptIn />;
@@ -197,7 +227,13 @@ export function CoachReport({ today }: { today: string }) {
         value={kind}
         onChange={setKind}
       />
-      {state === 'loading' ? (
+      {visitMode ? (
+        coach?.writing ? (
+          <Pending text="Your coach is looking at your habits…" />
+        ) : coach ? (
+          <Nudge message={coach} />
+        ) : null
+      ) : state === 'loading' ? (
         <Pending
           text={
             kind === 'daily'
@@ -263,6 +299,21 @@ const styles = StyleSheet.create({
   },
   byline: {
     fontSize: 12,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  label: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: 700,
+    letterSpacing: 0.8,
+  },
+  close: {
+    fontSize: 14,
+    lineHeight: 16,
   },
   highlightIcon: {
     fontSize: 16,

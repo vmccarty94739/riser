@@ -12,6 +12,7 @@ import Animated, { FadeIn, FadeInDown, FadeInRight, ZoomIn } from 'react-native-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CreateAccountForm, SignInForm } from '@/components/auth-forms';
+import { CoachNameField } from '@/components/coach-name-field';
 import { emptyHabit, HabitFields } from '@/components/habit-fields';
 import { HabitIcon } from '@/components/habit-icon';
 import { ThemedText } from '@/components/themed-text';
@@ -103,6 +104,7 @@ export default function OnboardingScreen() {
   // Remind: notification times.
   const [morning, setMorning] = useState(settings.morning);
   const [evening, setEvening] = useState(settings.evening);
+  const [coachPush, setCoachPush] = useState(settings.coachPush);
 
   const choices = [
     ...existing.flatMap((id) => {
@@ -159,7 +161,7 @@ export default function OnboardingScreen() {
       .forEach((s) => addHabit(s));
     const challengeId = challengeChoice ? ids[challengeChoice.key] : undefined;
     if (challengeId) startChallenge(challengeId, 3);
-    updateSettings({ reminders: allowed, morning, evening });
+    updateSettings({ reminders: allowed, morning, evening, coachPush });
     setOnboarded(true);
     setTimeout(() => {
       feedback('perfect');
@@ -438,8 +440,8 @@ export default function OnboardingScreen() {
           We’ll keep you on track
         </ThemedText>
         <ThemedText themeColor="textSecondary" style={styles.center}>
-          One nudge in the morning to set your intention, one in the evening if something’s still
-          open. Nothing when you’re done.
+          A nudge in the morning, a personal tip from your coach in the afternoon, and one in the
+          evening if something’s still open. Nothing when you’re done.
         </ThemedText>
         <Animated.View entering={FadeInDown.springify().delay(200)} style={styles.full}>
           <ThemedView type="backgroundElement" style={styles.notif}>
@@ -461,10 +463,20 @@ export default function OnboardingScreen() {
             <TimeField value={morning} title="Morning intention" onChange={setMorning} />
           </View>
           <View style={styles.timeRow}>
+            <ThemedText style={styles.flex}>Coach tip</ThemedText>
+            <TimeField value={coachPush} title="Coach tip" onChange={setCoachPush} />
+          </View>
+          <View style={styles.timeRow}>
             <ThemedText style={styles.flex}>Evening nudge</ThemedText>
             <TimeField value={evening} title="Evening nudge" onChange={setEvening} />
           </View>
         </ThemedView>
+        <View style={styles.full}>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.nameLabel}>
+            What should your coach call you?
+          </ThemedText>
+          <CoachNameField />
+        </View>
         <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
           You can change these anytime in Settings.
         </ThemedText>
@@ -711,6 +723,10 @@ function PresetCard({
 }
 
 const styles = StyleSheet.create({
+  nameLabel: {
+    marginBottom: Spacing.one,
+    paddingHorizontal: Spacing.one,
+  },
   root: {
     flex: 1,
   },

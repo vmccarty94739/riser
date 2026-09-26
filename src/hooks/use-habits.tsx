@@ -57,6 +57,9 @@ export const DEFAULT_SETTINGS: Settings = {
   coach: false,
   coachAsked: false,
   coachOff: false,
+  name: '',
+  coachPushOn: true,
+  coachPush: '15:00',
 };
 
 export const EMPTY_STORE: Store = {

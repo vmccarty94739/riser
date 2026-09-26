@@ -5,6 +5,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { Challenges } from '@/components/challenge-card';
+import { CoachVisitCard } from '@/components/coach-cards';
 import { HabitRow } from '@/components/habit-row';
 import { InfoButton } from '@/components/info-button';
 import { ScreenScroll } from '@/components/screen-scroll';
@@ -40,7 +41,7 @@ function greeting() {
 
 export default function DashboardScreen() {
   const theme = useTheme();
-  const { habits, challenges, loaded, startChallenge } = useHabits();
+  const { habits, challenges, loaded, startChallenge, settings } = useHabits();
   const today = dayKey();
   const [offset, setOffset] = useState(0);
   const day = addDays(today, offset);
@@ -144,7 +145,12 @@ export default function DashboardScreen() {
   };
 
   return (
-    <ScreenScroll title="Dashboard" subtitle={greeting()} action={<SettingsButton />}>
+    <ScreenScroll
+      title="Dashboard"
+      subtitle={settings.name ? `${greeting()}, ${settings.name}` : greeting()}
+      action={<SettingsButton />}>
+      <CoachVisitCard />
+
       {habits.length > 0 && (
         <SectionHeading
           title={live.length === 1 ? 'Challenge' : 'Challenges'}

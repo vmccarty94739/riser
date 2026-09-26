@@ -10,7 +10,13 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-const settings = { ...DEFAULT_SETTINGS, reminders: true, morning: '08:00', evening: '20:00' };
+const settings = {
+  ...DEFAULT_SETTINGS,
+  reminders: true,
+  morning: '08:00',
+  evening: '20:00',
+  coachPushOn: false,
+};
 
 describe('reminder planning', () => {
   it('never schedules in the past and stays under the iOS pending limit', () => {
@@ -69,5 +75,45 @@ describe('reminder planning', () => {
     const coach = { day: addDays(TODAY, -3), title: 'Old news', body: '…' };
     const plan = planReminders([habit()], [], settings, coach);
     expect(plan.some((p) => p.title.includes('Old news'))).toBe(false);
+  });
+});
+
+describe('afternoon coach tip', () => {
+  const coachOn = { ...settings, coachPushOn: true, coachPush: '15:00', name: 'Vaden' };
+  const tips = (plan: ReturnType<typeof planReminders>) =>
+    plan.filter((p) => p.date.getHours() === 15);
+
+  it('sends a personal insight at the chosen time today and tomorrow only', () => {
+    const walk = habit({ id: 'walk', name: 'Go for a walk' });
+    const read = habit({ id: 'read', name: 'Read 10 pages' });
+    for (let i = 1; i <= 14; i++) {
+      walk.log[addDays(TODAY, -i)] = 1;
+      if (i % 3 === 0) read.log[addDays(TODAY, -i)] = 1;
+    }
+    const [today, tomorrow, ...rest] = tips(planReminders([walk, read], [], coachOn));
+    expect(rest).toHaveLength(0);
+    expect(today.title).toContain('“Go for a walk”');
+    expect(today.body).toMatch(
+      /^Hey Vaden, I noticed you’ve been crushing “Go for a walk” lately .* have you considered giving “Read 10 pages” the same energy\?/
+    );
+    // A different insight tomorrow.
+    expect(tomorrow.body).not.toBe(today.body);
+  });
+
+  it('skips advice about a habit that is already done today', () => {
+    const walk = habit({ id: 'walk', name: 'Go for a walk' });
+    const read = habit({ id: 'read', name: 'Read 10 pages' });
+    for (let i = 1; i <= 14; i++) {
+      walk.log[addDays(TODAY, -i)] = 1;
+      if (i % 3 === 0) read.log[addDays(TODAY, -i)] = 1;
+    }
+    read.log[TODAY] = 1;
+    const [today] = tips(planReminders([walk, read], [], coachOn));
+    expect(today.body).not.toContain('have you considered giving “Read 10 pages”');
+  });
+
+  it('respects its switch and the coach switch', () => {
+    expect(tips(planReminders([habit()], [], { ...coachOn, coachPushOn: false }))).toHaveLength(0);
+    expect(tips(planReminders([habit()], [], { ...coachOn, coachOff: true }))).toHaveLength(0);
   });
 });

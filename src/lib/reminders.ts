@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { clockOffset } from '@/lib/clock';
+import { insightsFor } from '@/lib/coach-insights';
 import { iconText } from '@/lib/icons';
 import { checkinXp, habitCountOn } from '@/lib/xp';
 
@@ -23,6 +24,8 @@ import {
 
 /** How far ahead to schedule. Rescheduled on every change and app foreground. */
 const DAYS_AHEAD = 7;
+/** The coach's afternoon insight is only planned this many days out: it's about recent days. */
+const COACH_DAYS_AHEAD = 2;
 /** iOS keeps at most 64 pending local notifications per app. */
 const MAX_PENDING = 60;
 const CHANNEL = 'reminders';
@@ -92,6 +95,8 @@ export function planReminders(
   if (!habits.length) return planned;
   // The coach's nudge replaces the next upcoming morning message, while it's at most a day old.
   let coachNote = coach && coach.day >= addDays(today, -1) ? coach : null;
+
+  const coachIdsUsed: string[] = [];
 
   const live = challenges
     .filter((c) => !c.completedAt && !c.dismissed)
@@ -168,6 +173,30 @@ export function planReminders(
                   ),
         });
       });
+    }
+
+    // Afternoon: one personal insight from the coach ("I noticed you've been crushing…").
+    if (settings.coachPushOn && !settings.coachOff && offset < COACH_DAYS_AHEAD) {
+      const insight = insightsFor(habits, challenges, day, settings.name)
+        // Can't know tonight's final state, and skip advice about habits already done today.
+        .filter((i) => i.kind !== 'perfect-close' && !coachIdsUsed.includes(i.id))
+        .filter(
+          (i) =>
+            !isToday || !i.about.length || i.about.some((id) => pending.some((h) => h.id === id))
+        )
+        // The "crushing X, have you considered Y" note is the one people asked for.
+        .sort(
+          (a, b) =>
+            b.score + (b.kind === 'pair' ? 15 : 0) - (a.score + (a.kind === 'pair' ? 15 : 0))
+        )[0];
+      if (insight) {
+        coachIdsUsed.push(insight.id);
+        planned.push({
+          date: at(day, settings.coachPush),
+          title: `🧑‍🏫 ${insight.title}`,
+          body: insight.push,
+        });
+      }
     }
 
     // Evening: don't let the day close with the loop open.

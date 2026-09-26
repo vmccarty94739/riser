@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { instructions, SYSTEM } from '../../supabase/functions/coach/prompt-text';
 import type { Digest, Kind } from '../../supabase/functions/coach/stats';
+import type { Insight } from '@/lib/coach-insights';
 import type { Written } from '@/lib/coach-rules';
 
 /**
@@ -49,6 +50,18 @@ export const REFLECTION_SCHEMA: Schema = {
   focus: { type: 'string', description: 'One focus for the next period, at most 160 characters.' },
 };
 
+export const REWORD_SCHEMA: Schema = {
+  title: { type: 'string', description: 'A short headline, at most 50 characters.' },
+  message: {
+    type: 'string',
+    description: '1-3 sentences, at most 260 characters, spoken directly to the person.',
+  },
+  tip: {
+    type: 'string',
+    description: 'The same practical tip in your own words, at most 170 characters.',
+  },
+};
+
 const TIMEOUT_MS = 25_000;
 let downloadRequested = false;
 
@@ -85,6 +98,52 @@ function namesAHabit(tip: string, digest: Digest) {
         .split(/\s+/)
         .some((w) => w.length >= 4 && lower.includes(w))
   );
+}
+
+/**
+ * One insight (see `coach-insights.ts`) rewritten by the phone's model in a warmer, more personal
+ * voice. The facts and advice stay the same: every number must come from the insight, and it must
+ * still name the habit(s) it's about. Null when unavailable, slow or off-script.
+ */
+export async function rewordOnDevice(
+  insight: Insight,
+  name: string,
+  timeoutMs = 8000
+): Promise<Pick<Written, 'title' | 'body' | 'tip'> | null> {
+  if (!deviceModelReady()) return null;
+  const draft = `Title: ${insight.title}\nMessage: ${insight.body}\nTip: ${insight.tip}`;
+  const prompt = [
+    `Rewrite this coaching note for ${name || 'the person'} in your own words, like a warm personal coach who knows them. Keep the same observation and the same advice. Put every habit name in double quotes, exactly as written. Use only the numbers that appear below; don't add new facts, numbers or habits.`,
+    `<note>\n${draft}\n</note>`,
+    insight.facts ? `<facts>\n${insight.facts}\n</facts>` : '',
+  ].join('\n\n');
+  try {
+    const raw = await Promise.race([
+      generate(prompt, {
+        instructions: SYSTEM,
+        responseFormat: 'json',
+        schema: REWORD_SCHEMA,
+        options: { temperature: 0.7 },
+      }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
+    if (!raw) return null;
+    const out = JSON.parse(raw) as Record<string, unknown>;
+    const title = text(out.title);
+    const body = text(out.message);
+    const tip = text(out.tip);
+    if (!title || !body || !tip) return null;
+    if (title.length > 70 || body.length > 320 || tip.length > 220) return null;
+    if (!numbersAreReal(`${title} ${body} ${tip}`, `${draft}\n${insight.facts}`)) return null;
+    // It must still be about the same habit(s): every quoted name in the draft's message.
+    const plain = (t: string) => t.replace(/[“”"]/g, '').toLowerCase();
+    const names = [...insight.body.matchAll(/“([^”]+)”/g)].map((m) => m[1].toLowerCase());
+    const said = plain(`${title} ${body} ${tip}`);
+    if (!names.every((n) => said.includes(n))) return null;
+    return { title, body, tip };
+  } catch {
+    return null;
+  }
 }
 
 /** A message from the phone's model, or null (unavailable, timed out, or failed the checks). */

@@ -118,9 +118,12 @@ export const challengeRow = (c: Challenge): ChallengeRow => ({
   dismissed: c.dismissed,
 });
 
+// The first name stays on the phone (like proof photos), so the privacy answers don't change.
+const cloudSettings = ({ name: _name, ...rest }: Partial<Settings>) => rest;
+
 export const profileRow = (s: SyncedState): ProfileRow => ({
   seen_level: s.seenLevel,
-  settings: s.settings,
+  settings: cloudSettings(s.settings),
 });
 
 const checkinKey = (habitId: string, day: string) => `${habitId}|${day}`;
@@ -143,7 +146,10 @@ const habitJson = (r: HabitRow) =>
   );
 const challengeJson = (r: ChallengeRow) => JSON.stringify(challengeRow(fromChallengeRow(r)));
 const profileJson = (r: ProfileRow) =>
-  JSON.stringify({ seen_level: r.seen_level ?? null, settings: sortKeys(r.settings ?? {}) });
+  JSON.stringify({
+    seen_level: r.seen_level ?? null,
+    settings: sortKeys(cloudSettings(r.settings ?? {})),
+  });
 
 const sortKeys = (o: object) =>
   Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
@@ -345,7 +351,7 @@ export function mergeRemote<S extends SyncedState>(
         next = {
           ...next,
           seenLevel: remote.profile.seen_level ?? null,
-          settings: { ...next.settings, ...remote.profile.settings },
+          settings: { ...next.settings, ...cloudSettings(remote.profile.settings ?? {}) },
         };
         changed = true;
       }

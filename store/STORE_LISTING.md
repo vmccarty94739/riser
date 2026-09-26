@@ -41,10 +41,10 @@ PROOF PHOTOS
 Snap a photo when you complete a habit. Your Camera Roll keeps them all, sorted by date.
 
 YOUR PERSONAL COACH
-A nudge each morning written from your real streaks ("You've nailed sleep for 14 days! Water's lagging, so try this…"), plus weekly and monthly reports on what went well and what slipped. Written privately on your phone, with Apple Intelligence on supported iPhones.
+Fresh coaching every time you open the app, built from patterns in your own check-ins: the habit you're crushing next to the one that's slipping, the weekday that keeps going wrong, the habit that sets up your whole day. Plus an afternoon tip ("I noticed you've been crushing your walks lately, but have you considered…") and weekly and monthly reports. Written privately on your phone, with Apple Intelligence on supported iPhones.
 
 REMINDERS THAT HELP
-A morning intention, reminders at the times you choose, and an evening nudge only if something's still open. Nothing when you're done.
+A morning intention, a coach tip in the afternoon, reminders at the times you choose, and an evening nudge only if something's still open. Nothing when you're done.
 
 BACKED UP AND PRIVATE
 Your habits are saved on your phone and backed up to your private account, so a new phone picks up right where you left off. No ads, no tracking, no analytics.

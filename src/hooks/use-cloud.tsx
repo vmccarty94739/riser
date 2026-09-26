@@ -6,6 +6,7 @@ import { AppState } from 'react-native';
 import { EMPTY_STORE, useHabits, useStoreAccess, type Store } from '@/hooks/use-habits';
 import { authMessage, normalizeEmail } from '@/lib/auth';
 import { deleteRemoteAccount, pull, push } from '@/lib/cloud';
+import { clearVisitCoach } from '@/hooks/use-coach-visit';
 import { clearCoachCache } from '@/lib/coach';
 import { deleteProof } from '@/lib/proofs';
 import { cloudConfigured, supabase } from '@/lib/supabase';
@@ -379,6 +380,7 @@ export function CloudProvider({ children }: PropsWithChildren) {
   const wipeLocal = () => {
     epoch.current++;
     clearCoachCache();
+    clearVisitCoach();
     getStore().habits.forEach((h) => Object.values(h.proofs).forEach(deleteProof));
     setStore(EMPTY_STORE);
     meta.current = null;
