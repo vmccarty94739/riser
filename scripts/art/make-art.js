@@ -112,6 +112,14 @@ render(
   96
 );
 
+// Email header icon, hosted by GitHub Pages at /timber/email-icon.png for the account emails.
+render(
+  'email-icon.png',
+  svg(1024, 1024, `<rect width="1024" height="1024" fill="${WALNUT}"/>${glyph()}`),
+  144,
+  { opaque: true, dir: path.join(OUT, '../../docs') }
+);
+
 // Favicon.
 render(
   'favicon.png',
