@@ -50,8 +50,8 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
-/** Timber's brand blue: app icon, splash screen and launch overlay. */
-export const BrandColor = '#1A78E6';
+/** Timber's brand walnut: app icon background, splash screen and launch overlay. */
+export const BrandColor = '#2B1A10';
 
 /**
  * Chart palettes (validated for color-vision deficiency; keep the order).
